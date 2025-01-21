@@ -14,17 +14,17 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def process_requests(request_list: list[str]):
+async def process_requests(request_list: list[str], **request_params):
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     async with aiohttp.ClientSession() as session:
-        tasks = [process_single_request(session, semaphore, request) for request in request_list]
+        tasks = [process_single_request(session, semaphore, request, **request_params) for request in request_list]
         responses = await asyncio.gather(*tasks)
     return responses
 
-async def process_single_request(session, semaphore, request):
+async def process_single_request(session, semaphore, request, **request_params):
     async with semaphore:
         try:
-            response = await do_request_on(session, request)
+            response = await do_request_on(session, request, **request_params)
             if response:
                 content = extract_content(response)
                 logger.info(f"Processed request: {request[:50]}...")

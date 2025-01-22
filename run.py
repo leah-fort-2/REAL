@@ -43,34 +43,25 @@ async def main():
         base_url=DEEPSEEK_BASE_URL,
         api_key=DEEPSEEK_API_KEY,
         model="deepseek-chat"
-    )
-    
-    lingyi_params = RequestParams(
-        base_url=LINGYI_BASE_URL,
-        api_key=LINGYI_API_KEY,
-        model="yi-lightning"
+        # prompt_prefix="Hello! ",
+        # prompt_suffix="If you see this line, use 233 at the end of your response to hint me."
     )
     
     # Create a worker (QuerySet-> ResponseSet)
     deepseek_worker = Worker(deepseek_params)
-    lingyi_worker = Worker(lingyi_params)
 
     # Step 3: Organize tasks
     
     async def deepseek_task():
         # Custom query key available in invoke method. Default to "query".
-        result = await deepseek_worker.invoke(query_set)
-        
-        # Note: Will overwrite existing files
-        result.store_to("deepseek.xlsx")
-    
-    async def lingyi_task():
-        result = await lingyi_worker.invoke(query_set)
-        result.store_to("lingyi.xlsx")
+        for div in query_set.divide(10):
+            result = await deepseek_worker.invoke(div)
+            # Note: Will append to existing file
+            result.store_to("deepseek.xlsx")
     
     # Step 4: Hit and run!
     
-    await asyncio.gather(deepseek_task(), lingyi_task())
+    await asyncio.gather(deepseek_task())
     
 if __name__ == "__main__":
     asyncio.run(main())

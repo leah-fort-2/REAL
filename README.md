@@ -51,7 +51,7 @@ The tool is designed to conveniently launch concurrent requests to LLM APIs.
     > ```py
     > EditedResponses = ResponseSet({"response": "...", "score": 1})
     > ```
-   - When you are done, use `store_to` method to export results. Only csv and xlsx are supported.
+   - When you are done, use `store_to` method to export results (append). Only csv and xlsx are supported.
    ```py
     responses = await deepseek_worker.invoke(test_queries)
     responses.store_to("deepseek.csv")
@@ -121,6 +121,20 @@ async def main():
 
     asyncio.gather(deepseek_task(), friday_task())
 ```
+
+### Batch request & Dataset division
+
+You can set a `BATCH_SIZE` limit in .env file to limit concurrent request number.
+
+You can also use `divide` method from `QuerySet` instances. This helps keep tasks in parcels when you have a large dataset.
+
+```py
+for div in query_set.divide(10):
+    result = await deepseek_worker.invoke(div)
+    # Note: Will append to existing file
+    result.store_to("deepseek.xlsx")
+```
+Multiple results will append sequentially to the specified file.
 
 ### Directly access a request list
 

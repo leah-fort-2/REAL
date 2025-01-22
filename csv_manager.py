@@ -1,4 +1,5 @@
 import csv
+import os
 
 def store_to_csv(filename, data_list):
     if not data_list:
@@ -6,9 +7,11 @@ def store_to_csv(filename, data_list):
     
     fieldnames = data_list[0].keys()
     
-    with open(filename, 'w', newline='', encoding="utf-8") as csvfile:
+    header_flag = not os.path.exists(filename) or os.path.getsize(filename) == 0
+    with open(filename, 'a', newline='', encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
+        if header_flag:
+            writer.writeheader()
         for row in data_list:
             writer.writerow(row)
 

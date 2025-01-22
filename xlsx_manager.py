@@ -4,16 +4,26 @@ def store_to_excel(excel_filename, data_list):
     if not data_list:
         return
     
-    workbook = openpyxl.Workbook()
-    worksheet = workbook.active
+    try:
+        workbook = openpyxl.load_workbook(excel_filename)
+        worksheet = workbook.active
+        # Get existing headers
+        existing_headers = [cell.value for cell in worksheet[1]]
+        # Merge existing headers with new headers
+        column_headers = list(set(existing_headers + list(data_list[0].keys())))
+    except FileNotFoundError:
+        workbook = openpyxl.Workbook()
+        worksheet = workbook.active
+        column_headers = data_list[0].keys()
     
-    # Write headers
-    column_headers = list(data_list[0].keys())
-    worksheet.append(column_headers)
+    # If new headers are added, update the header row
+    if len(column_headers) > len(existing_headers):
+        for col, header in enumerate(column_headers, start=1):
+            worksheet.cell(row=1, column=col, value=header)
     
     # Write data rows
     for data_row in data_list:
-        worksheet.append([data_row[header] for header in column_headers])
+        worksheet.append([data_row.get(header, "") for header in column_headers])
     
     workbook.save(excel_filename)
 

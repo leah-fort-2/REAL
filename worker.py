@@ -15,6 +15,9 @@ DEFAULT_TOP_P = float(os.getenv("TOP_P"))
 DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS"))
 DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))
 DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))
+DEFAULT_SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT")
+DEFAULT_PROMPT_PREFIX = os.getenv("PROMPT_PREFIX")
+DEFAULT_PROMPT_SUFFIX = os.getenv("PROMPT_SUFFIX")
 
 class RequestParams:
     """
@@ -36,7 +39,10 @@ class RequestParams:
                  top_p=DEFAULT_TOP_P,
                  max_tokens=DEFAULT_MAX_TOKENS,
                  frequency_penalty=DEFAULT_FREQUENCY_PENALTY,
-                 presence_penalty=DEFAULT_PRESENCE_PENALTY
+                 presence_penalty=DEFAULT_PRESENCE_PENALTY,
+                 system_prompt=DEFAULT_SYSTEM_PROMPT,
+                 prompt_prefix=DEFAULT_PROMPT_PREFIX,
+                 prompt_suffix=DEFAULT_PROMPT_SUFFIX
                  ):
         self.api_url = base_url + "/chat/completions"
         self.api_key = api_key
@@ -46,6 +52,9 @@ class RequestParams:
         self.top_p = top_p
         self.frequency_penalty = frequency_penalty
         self.presence_penalty = presence_penalty
+        self.system_prompt = system_prompt
+        self.prompt_prefix = prompt_prefix
+        self.prompt_suffix = prompt_suffix
         
     def get_params(self):
         return {
@@ -56,7 +65,10 @@ class RequestParams:
             "max_tokens": self.max_tokens,
             "top_p": self.top_p,
             "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty
+            "presence_penalty": self.presence_penalty,
+            "system_prompt": self.system_prompt,
+            "prompt_prefix": self.prompt_prefix,
+            "prompt_suffix": self.prompt_suffix
         }
         
 class Worker:

@@ -1,6 +1,5 @@
 from batch_request import process_requests
-from csv_manager import store_to_csv, read_from_csv
-from xlsx_manager import store_to_excel, read_from_excel
+from dataset_models import ResponseSet
 
 import os
 from dotenv import load_dotenv
@@ -18,6 +17,17 @@ DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))
 DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))
 
 class RequestParams:
+    """
+        Request parameters for OpenAI compatible APIs. If not specified, use global settings in .env file.
+        - api_url
+        - api_key
+        - model
+        - temperature
+        - max_tokens
+        - top_p
+        - frequency_penalty
+        - presence_penalty        
+    """
     def __init__(self, 
                  base_url=DEFAULT_BASE_URL, 
                  api_key=DEFAULT_API_KEY, 
@@ -48,29 +58,40 @@ class RequestParams:
             "frequency_penalty": self.frequency_penalty,
             "presence_penalty": self.presence_penalty
         }
-
-async def work(request_params: RequestParams, input_path="queries.csv", query_key="query", output_path="responses.csv"):
-    if input_path.endswith('.csv'):
-        request_list = read_from_csv(input_path, query_key)
-    elif input_path.endswith('.xlsx'):
-        request_list = read_from_excel(input_path, query_key)
-    else:
-        raise ValueError(f"Reading from unsupported file format: \"{input_path}\". Please use CSV or XLSX.")    
-    # request_list = ["hi", "how are you? "]
+        
+class Worker:
+    def __init__(self, request_params: RequestParams):
+        self.request_params = request_params
+        
+    def get_params(self):
+        return self.request_params.get_params()
     
-    if not output_path.endswith('.csv') and not output_path.endswith('.xlsx'):
-        raise ValueError(f"Storing to unsupported file format: \"{output_path}\". Please use CSV or XLSX.")
-    
-    params = request_params.get_params()
-    response_texts = await process_requests(request_list, **params)
-    
-    responses = []
-    
-    for request, response_text in zip(request_list, response_texts):
-        responses.append({"request": request, "response": response_text})
-
-    if output_path.endswith('.csv'):
-        store_to_csv(responses, output_path)
-    else:
-        # output_path ends with '.xlsx'
-        store_to_excel(responses, output_path)
+    async def invoke(self, query_set, query_key="query"):
+        queries = query_set.get_queries()
+        
+        # Acquire a query string list
+        try:
+            # Case 1: query_set is initialized from a file...
+            query_list = [query[query_key] for query in queries]
+        except TypeError:
+            # Case 2: or a list of query strings
+            query_list = queries
+        
+        # Launch requests
+        params = self.get_params()
+        response_list = await process_requests(query_list, **params)
+        
+        # Post works
+        try:
+            # Case 1: update the original query_list
+            for query, response in zip(queries, response_list):
+                query.update({"response": response})
+        except AttributeError:
+            # Case 2: str has no update attribute
+            # Construct a new dict for each query and response pair
+            queries = [
+                {
+                    "query": query,
+                    "response": response
+                } for query, response in zip(queries, response_list)]
+        return ResponseSet(queries)

@@ -1,6 +1,6 @@
 import openpyxl
 
-def store_to_excel(data_list, excel_filename):
+def store_to_excel(excel_filename, data_list):
     if not data_list:
         return
     
@@ -17,23 +17,30 @@ def store_to_excel(data_list, excel_filename):
     
     workbook.save(excel_filename)
 
-def read_from_excel(excel_filename, column_name="query"):
+def read_from_excel(excel_filename, fields=[]):
     try:
         workbook = openpyxl.load_workbook(excel_filename)
         worksheet = workbook.active
         
         header_row = [cell.value for cell in worksheet[1]]
-        column_index = header_row.index(column_name) if column_name in header_row else None
         
-        column_data = []
-        if column_index is not None:
-            for row in worksheet.iter_rows(min_row=2, values_only=True):
-                column_data.append(row[column_index])
-                
-        if len(column_data) == 0:
-            raise ValueError(f"Key \"{column_name}\" not found in the Excel file.")
-        
-        return column_data
+        if len(fields) == 0:
+            # Unspecified fields, read all fields
+            column_indices = range(len(header_row))
+            selected_headers = header_row
+        else:
+            # Read only the specified fields
+            column_indices = [header_row.index(col) for col in fields if col in header_row]
+            selected_headers = fields
+
+        data = []
+        for row in worksheet.iter_rows(min_row=2, values_only=True):
+            row_data = {selected_headers[i]: row[column_indices[i]] for i in range(len(column_indices))}
+            data.append(row_data)
+            
+        if len(data) == 0:
+            raise ValueError(f"No data found for any specified column(s): \"{fields}\". Either the file \"{excel_filename}\" is empty or none of the column(s) exist.")
+        return data
     
     except FileNotFoundError:
         raise FileNotFoundError(f"Excel file \"{excel_filename}\" not found. You are likely to read from a non-existent file.")

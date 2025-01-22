@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def process_requests(request_list: list[str], **request_params):
+    # Returns a list of response strings
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     async with aiohttp.ClientSession() as session:
         tasks = [process_single_request(session, semaphore, request, **request_params) for request in request_list]
@@ -24,6 +25,8 @@ async def process_requests(request_list: list[str], **request_params):
 async def process_single_request(session, semaphore, request, **request_params):
     async with semaphore:
         try:
+            if request == "":
+                logger.warning(f"I found an empty query, but will proceed requesting with it.")
             response = await do_request_on(session, request, **request_params)
             if response:
                 content = extract_content(response)

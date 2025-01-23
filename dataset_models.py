@@ -4,7 +4,10 @@ import copy
 
 class QuerySet:
     def __init__(self, file_path_or_query_list, field_names=[]):
-        """Leave field names empty if you wish to keep all fields"""
+        """Leave field names empty if you wish to keep all fields
+        
+        Accept a data file path or a query string list.
+        """
         if isinstance(file_path_or_query_list, str):
             # A path to the query file is provided
             if not file_path_or_query_list.endswith('.csv') and not file_path_or_query_list.endswith('.xlsx'):
@@ -17,14 +20,17 @@ class QuerySet:
         else:
             # A list of queries is provided
             self.file_path = None
-            self.queries = file_path_or_query_list
+            self.queries = [{"query": query} for query in file_path_or_query_list]
             
     def get_queries(self):
         return copy.deepcopy(self.queries)
     
+    def get_query_list(self):
+        return [query["query"] for query in self.queries]
+    
     def divide(self, division_size=10):
         """Split an entire query set into divisions. Particularly useful when a query set is very large (>100). Returns division-sized query lists."""
-        return [QuerySet(self.queries[i:i + division_size]) for i in range(0, len(self.queries), division_size)]
+        return [QuerySet(self.get_query_list()[i:i + division_size]) for i in range(0, len(self.queries), division_size)]
     
 class ResponseSet:
     def __init__(self, response_list: list[dict]):

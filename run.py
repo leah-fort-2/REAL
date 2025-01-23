@@ -20,22 +20,22 @@ async def main():
     # Step 1: Instantiate a QuerySet object
     
     # Only csv and xlsx files supported
-    query_set=QuerySet("example_queries.csv")
+    # query_set=QuerySet("example_queries.csv")
 
     # You can use a local list instead
     
-    # query_list = [
-    #     "What's the city with the lowest annual average temperature in the world?",
-    #     "Which city has the highest population density in the world?",
-    #     "What is the capital of France?",
-    #     "Who wrote 'Romeo and Juliet'?",
-    #     "What is the largest ocean on Earth?",
-    #     "Which country is known as the Land of the Rising Sun?",
-    #     "What is the currency of Japan?",
-    #     "Who painted the Mona Lisa?",
-    #     "What is the tallest mountain in the world?"
-    # ]
-    # query_set = QuerySet(query_list)
+    query_list = [
+        "What's the city with the lowest annual average temperature in the world?",
+        "Which city has the highest population density in the world?",
+        "What is the capital of France?",
+        "Who wrote 'Romeo and Juliet'?",
+        "What is the largest ocean on Earth?",
+        "Which country is known as the Land of the Rising Sun?",
+        "What is the currency of Japan?",
+        "Who painted the Mona Lisa?",
+        "What is the tallest mountain in the world?"
+    ]
+    query_set = QuerySet(query_list)
 
     # Step 2: Create a RequestParams object. It's like a reusable worker profile.
     
@@ -53,11 +53,14 @@ async def main():
     # Step 3: Organize tasks
     
     async def deepseek_task():
-        # Custom query key available in invoke method. Default to "query".
+        
+        # You can use chunked query_set to create sub jobs.
         for div in query_set.divide(10):
-            result = await deepseek_worker.invoke(div)
+            # A worker can be called with a QuerySet instance.
+            # Custom query_key available. Default to "query".
+            result = await deepseek_worker(div, query_key="query").invoke()
             # Note: Will append to existing file
-            result.store_to("deepseek.xlsx")
+            result.store_to("Book1.csv")
     
     # Step 4: Hit and run!
     

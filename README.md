@@ -40,7 +40,7 @@ The tool is designed to conveniently launch concurrent requests to LLM APIs.
 
     default_params = RequestParams()
     ```
-   - Spawn `Worker` instances. `Worker` instances are not callable. To actually use them, load `invoke` with a `QuerySet` instance and an optional query column name `query_key`.
+   - Spawn `Worker` instances. `Worker` instances can be called with a `QuerySet` instance and an optional query column name `query_key` to create a `Job`. To actually start the `Job`, use `invoke()` on it.
     > The worker will submit request with only values in `query_key` column. If left blank, the column `query` will be used.
     >
       - Adjust the workflow to your use case
@@ -77,7 +77,7 @@ deepseek_params = RequestParams(
 deepseek_worker = Worker(deepseek_params)
 
 async def deepseek_task():
-    result = await deepseek_worker.invoke(query_set, query_key="query")
+    result = await deepseek_worker(query_set, query_key="query").invoke()
     
     # Note: Will overwrite existing files
     result.store_to("deepseek.xlsx")
@@ -108,12 +108,12 @@ async def main():
     # ...
 
     async def deepseek_task():
-        result = await deepseek_worker.invoke(query_set, query_key="query")
+        result = await deepseek_worker(query_set, query_key="query").invoke()
         result.store_to("deepseek.xlsx")
         return result
 
     async def friday_task():
-        result = await friday_worker.invoke(query_set, query_key="query")
+        result = await friday_worker(query_set, query_key="query").invoke()
         result.store_to("friday.csv")
         return result
 

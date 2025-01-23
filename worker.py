@@ -1,5 +1,5 @@
 from batch_request import process_requests
-from dataset_models import ResponseSet
+from dataset_models import QuerySet, ResponseSet
 
 import os
 from dotenv import load_dotenv
@@ -72,38 +72,44 @@ class RequestParams:
         }
         
 class Worker:
+    class Job:
+        def __init__(self, worker, query_set_or_template, query_key="query"):
+            self.worker = worker
+            self.query_set_or_template = query_set_or_template
+            self.query_key = query_key
+        
+        def __len__(self):
+            return len(self.query_set_or_template)
+        
+        def get_query_set(self):
+            return self.query_set_or_template
+        
+        def get_worker(self):
+            return self.worker
+        
+        async def invoke(self):
+            worker = self.worker
+            query_key = self.query_key
+            # queries: list({query_key: <query_str>})
+            queries = self.query_set_or_template.get_queries()
+            
+            # Acquire a query string list
+            query_list = [query[query_key] for query in queries]
+            
+            # Launch requests
+            params = worker.get_params()
+            response_list = await process_requests(query_list, **params)
+            
+            # Post works
+            for query, response in zip(queries, response_list):
+                query.update({"response": response})
+            return ResponseSet(queries)
+        
     def __init__(self, request_params: RequestParams):
         self.request_params = request_params
         
+    def __call__(self, query_set: QuerySet, query_key="query"):
+        return self.Job(self, query_set, query_key)
+        
     def get_params(self):
         return self.request_params.get_params()
-    
-    async def invoke(self, query_set, query_key="query"):
-        queries = query_set.get_queries()
-        
-        # Acquire a query string list
-        try:
-            # Case 1: query_set is initialized from a file...
-            query_list = [query[query_key] for query in queries]
-        except TypeError:
-            # Case 2: or a list of query strings
-            query_list = queries
-        
-        # Launch requests
-        params = self.get_params()
-        response_list = await process_requests(query_list, **params)
-        
-        # Post works
-        try:
-            # Case 1: update the original query_list
-            for query, response in zip(queries, response_list):
-                query.update({"response": response})
-        except AttributeError:
-            # Case 2: str has no update attribute
-            # Construct a new dict for each query and response pair
-            queries = [
-                {
-                    "query": query,
-                    "response": response
-                } for query, response in zip(queries, response_list)]
-        return ResponseSet(queries)

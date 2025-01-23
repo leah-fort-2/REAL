@@ -40,20 +40,31 @@ The tool is designed to conveniently launch concurrent requests to LLM APIs.
 
     default_params = RequestParams()
     ```
-   - Spawn `Worker` instances. `Worker` instances can be called with a `QuerySet` instance and an optional query column name `query_key` to create a `Job`. To actually start the `Job`, use `invoke()` on it.
-    > The worker will submit request with only values in `query_key` column. If left blank, the column `query` will be used.
+   - Spawn `Worker` instances. a `Worker` must be initialized with a `RequestParams` profile.
+   - When calling a `Worker` instance with a `QuerySet` instance, you create a `Worker.Job` instance. An optional query column name `query_key` is available when creating a `Job`.
+    > The worker will submit request with only values in `query_key` column. If left blank, the column "`query`" will be used.
     >
-      - Adjust the workflow to your use case
-        - Use multiple workers for different test sets
-        - Or use multiple profiles
-        - Or write your own task functions
-    > `Worker.invoke(...)` returns `ResponseSet` instance. You can easily instantiate it from a list of responses.
+   - To actually start the `Job`, use `invoke()` on it.
+   ```py
+   deepseek_worker = Worker(deepseek_params)
+   deepseek_job = deepseek_worker(test_queries, query_key="query")
+   # To actually start the job
+   deepseek_job.invoke()
+   ```
+3. **Adjust the workflow to your use case**
+    - Use multiple workers for different test sets
+    - Or use multiple profiles
+    - Or write your own task functions
+    > `Job.invoke(...)` returns `ResponseSet` instance. You can instantiate `ResponseSet` from a list of responses.
     > ```py
-    > EditedResponses = ResponseSet({"response": "...", "score": 1})
+    > edited_responses = [{"response": "...", "score": 1}, ...]
+    > response_set = ResponseSet(edited_responses)
+    > response_set.get_responses()
+    > # [{"response": "...", "score": 1}, ...]
     > ```
    - When you are done, use `store_to` method to export results (append). Only csv and xlsx are supported.
    ```py
-    responses = await deepseek_worker.invoke(test_queries)
+    responses = await deepseek_job.invoke(test_queries)
     responses.store_to("deepseek.csv")
     # Or
     EditedResponses.store_to("edited_responses.csv")
@@ -126,11 +137,11 @@ async def main():
 
 You can set a `BATCH_SIZE` limit in .env file to limit concurrent request number.
 
-You can also use `divide` method from `QuerySet` instances. This helps keep tasks in parcels when you have a large dataset.
+You can also use `divide` method from `QuerySet` instances. This creates a list of subsets you can test with in parcels.
 
 ```py
 for div in query_set.divide(10):
-    result = await deepseek_worker.invoke(div)
+    result = await deepseek_worker(div).invoke()
     # Note: Will append to existing file
     result.store_to("deepseek.xlsx")
 ```

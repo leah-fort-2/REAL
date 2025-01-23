@@ -25,8 +25,8 @@ class QuerySet:
     def get_queries(self):
         return copy.deepcopy(self.queries)
     
-    def get_query_list(self):
-        return [query["query"] for query in self.queries]
+    def get_query_list(self, query_key="query"):
+        return [query[query_key] for query in self.queries]
     
     def divide(self, division_size=10):
         """Split an entire query set into divisions. Particularly useful when a query set is very large (>100). Returns division-sized query lists."""

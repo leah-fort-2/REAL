@@ -7,7 +7,7 @@ MAX_CONCURRENT_REQUESTS = int(os.getenv('BATCH_SIZE'))
 
 import asyncio
 import aiohttp
-from api_actions import do_request_on, extract_content
+from api_actions import do_request_on, extract_content, extract_content_with_reasoning
 import logging
 
 # Configure logging
@@ -29,11 +29,13 @@ async def process_single_request(session, semaphore, request, **request_params):
                 logger.warning(f"I found an empty query, but will proceed requesting with it.")
             response = await do_request_on(session, request, **request_params)
             if response:
+                # Deepseek reasoner now supports outputting its reflection process. You can use extract_content to get the response content only.
+                # content = extract_content_with_reasoning(response)
                 content = extract_content(response)
                 logger.info(f"Processed request: {request[:50]}...")
                 return content
             else:
-                logger.error(f"Failed to process request: {request[:50]}...")
+                logger.error(f"Failed to process request: {request[:50]}... Response: {response}")
                 return None
         except Exception as e:
             logger.error(f"Error processing request: {request[:50]}... Error: {str(e)}")

@@ -43,4 +43,4 @@ def judge(response_list, eval_name="Test set"):
     return {"eval_name": eval_name, "pass_rate": round(score/full_score, 3), "score": score, "full_score": full_score}
 
 def sanitize_pathname(pathname):
-    return re.sub(r'[^\w\-_\.]', '_', f"eval_result-{pathname}")
+    return re.sub(r'[^\w\-_\.]', '_', f"{pathname}")

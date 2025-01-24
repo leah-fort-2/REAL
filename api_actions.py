@@ -26,9 +26,13 @@ async def do_request_on(session, request_text, **request_params):
             async with session.post(API_URL, json=request_body, headers=headers, timeout=timeout) as response:
                 if response.status == 200:
                     return await response.json()
+                if attempt < max_attempts: 
+                    logger.warning(f"API request failed with status {response.status}. Response: {await response.text()}. Attempt {attempt + 1} of {max_attempts}")
+                    await asyncio.sleep(1)  # Wait for 1 second before retrying
                 else:
                     logger.error(f"API request failed with status {response.status}. Response: {await response.text()}")
                     return None
+                        
         except asyncio.TimeoutError:
             if attempt < max_attempts:
                 logger.warning(f"API request timed out after 60 seconds. Attempt {attempt + 1} of {max_attempts}")

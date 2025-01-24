@@ -3,13 +3,14 @@ from dataset_models import QuerySet
 from dotenv import load_dotenv
 import asyncio
 import os
+from eval_utils import list_files_in_directory
 
 load_dotenv()
 
 # Load custom BASE_URL and API_KEY from .env file
 
-DEEPSEEK_BASE_URL = os.getenv('DEEPSEEK_BASE_URL')
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
+BASE_URL = os.getenv("BASE_URL")
+API_KEY = os.getenv("API_KEY")
 
 async def main():
     # Example usage with deepseek. But you can use any api provider:    
@@ -17,8 +18,11 @@ async def main():
     # Step 1: Instantiate a QuerySet object
     
     # Only csv and xlsx files supported
-    query_set=QuerySet("loc_pt.xlsx")
+    DATASET_DIR="dataset"
+    dataset_paths = list_files_in_directory(DATASET_DIR, ".csv")
 
+    # Prepare query_set
+    query_set = QuerySet(dataset_paths[0])
     # You can use a local list instead
     
     # query_list = [
@@ -36,26 +40,47 @@ async def main():
 
     # Step 2: Create a RequestParams object. It's like a reusable worker profile.
     
-    solo_system_prompt="You are a professional localization engineer and your language pair is Simplified Chinese => Portuguese (Brazil)."
-       
-    
+    solo_system_prompt="You are a helpful assistant. Select the correct or the most appropriate option."
+    MODEL = "qwen2.5-coder-instruct"
     solo_params = RequestParams(
-        base_url=DEEPSEEK_BASE_URL,
-        api_key=DEEPSEEK_API_KEY,
-        model="deepseek-reasoner",
+        base_url=BASE_URL,
+        api_key=API_KEY,
+        model=MODEL,
         system_prompt=solo_system_prompt
     )
     
     # Create a worker (QuerySet-> ResponseSet)
-    deepseek_solo_worker = Worker(solo_params)
+    solo_worker = Worker(solo_params)
     # Step 3: Organize tasks
     
-    async def solo_task():
-        result = await deepseek_solo_worker(query_set).invoke()
-        result.store_to("solo_results_pt.xlsx")
-       
+    async def task(query_set:QuerySet):
+        query_set_name = query_set.get_path()
+        output_path=f"eval_result-{query_set_name.replace('/', '-').replace('\\', "-")}"
+        print(f"Testing: {query_set_name}. Dataset size: {len(query_set)}。")
+        
+        # The dataset contains options, so concatenate options with the question to create an updated temp query set
+        # A "query" key is inserted into each query dict.
+        updated_query = query_set.get_queries()
+        [query.update(
+            {"query": 
+                "\n".join([query["question"], query["A"], query["B"], query["C"], query["D"]])
+                }) for query in updated_query]
+        updated_query_set = QuerySet(updated_query)
+        
+        async def subtask(chunk, output_path, query_key):
+            responses = await solo_worker(chunk, query_key).invoke()
+            responses.store_to(output_path)
+        
+        subtask_list = []
+        for chunk in updated_query_set.divide(10):
+            subtask_list.append(subtask(chunk, output_path, query_key="query"))
+            
+        await asyncio.gather(*subtask_list)
+        # result = await deepseek_solo_worker(query_set).invoke()
+        # result.store_to("solo_results_pt.xlsx")
+
     # Step 4: Hit and run!
-    await asyncio.gather(solo_task())
+    await asyncio.gather(task(query_set))
 
 if __name__ == "__main__":
     asyncio.run(main())

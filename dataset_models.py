@@ -17,11 +17,24 @@ class QuerySet:
                 self.queries = read_from_csv(file_path_or_query_list, field_names)
             elif file_path_or_query_list.endswith('.xlsx'):
                 self.queries = read_from_excel(file_path_or_query_list, field_names)
+        elif len(file_path_or_query_list)==0:
+            # The provided query list is empty
+            print(f"Empty set encountered on {file_path_or_query_list}.")
+        elif isinstance(file_path_or_query_list[0], dict):
+            # A query dictionary is provided as is
+            self.file_path = None
+            self.queries = file_path_or_query_list
         else:
-            # A list of queries is provided
+            # A list of query strings is provided
             self.file_path = None
             self.queries = [{"query": query} for query in file_path_or_query_list]
-            
+    
+    def __len__(self):
+        return len(self.queries)
+    
+    def get_path(self):
+        return self.file_path
+    
     def get_queries(self):
         return copy.deepcopy(self.queries)
     
@@ -29,8 +42,18 @@ class QuerySet:
         return [query[query_key] for query in self.queries]
     
     def divide(self, division_size=10):
-        """Split an entire query set into divisions. Particularly useful when a query set is very large (>100). Returns division-sized query lists."""
-        return [QuerySet(self.get_query_list()[i:i + division_size]) for i in range(0, len(self.queries), division_size)]
+        """Split an entire query set into divisions with remainders e.g. [10, 10, 10, 5]. 
+        
+        Subsets inherit all fields and file path from the parent set. 
+        
+        Returns (less than or equal to) division-sized query set."""
+        
+        def spawn_subset(queries_chunk, path):
+            subset = QuerySet(queries_chunk)
+            subset.file_path = path
+            return subset
+        
+        return [spawn_subset(self.get_queries()[i:i + division_size], self.get_path()) for i in range(0, len(self.queries), division_size)]
     
 class ResponseSet:
     def __init__(self, response_list: list[dict]):

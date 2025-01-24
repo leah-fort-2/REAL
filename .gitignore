@@ -5,3 +5,4 @@ __pycache__
 *.xlsx
 test_*
 !example_queries.csv
+datasets/

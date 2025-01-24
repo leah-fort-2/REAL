@@ -135,9 +135,9 @@ async def main():
 
 ### Batch request & Dataset division
 
-You can set a `BATCH_SIZE` limit in .env file to limit concurrent request number.
+You can set a `BATCH_SIZE` limit in .env file to limit concurrent request number. (Default = 10)
 
-You can also use `divide` method from `QuerySet` instances. This creates a list of subsets you can test with in parcels.
+You can also use `divide` method from `QuerySet` instances. This creates a list[QuerySet] you can test with in parcels.
 
 ```py
 for div in query_set.divide(10):

@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MAX_CONCURRENT_REQUESTS = int(os.getenv('BATCH_SIZE'))
+MAX_CONCURRENT_REQUESTS = int(os.getenv('BATCH_SIZE'), "10")
 
 import asyncio
 import aiohttp

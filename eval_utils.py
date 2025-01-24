@@ -1,3 +1,4 @@
+import re
 import os 
 
 def list_files_in_directory(directory, match_pattern=""):
@@ -40,3 +41,6 @@ def judge(response_list, eval_name="Test set"):
         f"======\nEvaluation Report:\nEvaluation Name: {eval_name}\nAccuracy: {score}/{full_score} ({100*round(score/full_score, 3)}%)\n======\n")
 
     return {"eval_name": eval_name, "pass_rate": round(score/full_score, 3), "score": score, "full_score": full_score}
+
+def sanitize_pathname(pathname):
+    return re.sub(r'[^\w\-_\.]', '_', f"eval_result-{pathname}")

@@ -73,6 +73,9 @@ class RequestParams:
         
 class Worker:
     class Job:
+        """
+        You are not supposed to directly create a Job instance. Use Worker instance to create one.
+        """
         def __init__(self, worker, query_set_or_template, query_key="query"):
             self.worker = worker
             self.query_set_or_template = query_set_or_template

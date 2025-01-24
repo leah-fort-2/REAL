@@ -55,6 +55,21 @@ class QuerySet:
         
         return [spawn_subset(self.get_queries()[i:i + division_size], self.get_path()) for i in range(0, len(self.queries), division_size)]
     
+    def merge_keys(self, key_list_to_merge, merged_key_name):
+        """
+        Create a new QuerySet where specified keys are merged into a new key. The merged fields are concatenated with line breakers (\\n). The original QuerySet remains unchanged.
+        
+        A typical use case is to merge question and options into a single field for MCQ-type dataset evaluation.  
+        """
+        updated_query = self.get_queries()
+        for query in updated_query:
+            merged_value = "\n".join([query[key] for key in key_list_to_merge])
+            query[merged_key_name] = merged_value
+            
+        updated_query_set = QuerySet(updated_query)
+        updated_query_set.file_path = self.file_path
+        return updated_query_set
+    
 class ResponseSet:
     def __init__(self, response_list: list[dict]):
         self.responses = response_list

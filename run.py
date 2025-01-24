@@ -3,7 +3,7 @@ from dataset_models import QuerySet
 from dotenv import load_dotenv
 import asyncio
 import os
-from eval_utils import list_files_in_directory
+from eval_utils import list_files_in_directory, sanitize_pathname
 
 load_dotenv()
 
@@ -23,6 +23,9 @@ async def main():
 
     # Prepare query_set
     query_set = QuerySet(dataset_paths[0])
+    # The dataset contains options, so concatenate options with the question to create an updated temp query set
+    # A "query" key is inserted into each query dict.
+    updated_query_set = query_set.merge_keys(["question", "A", "B", "C", "D"], "query")
     # You can use a local list instead
     
     # query_list = [
@@ -53,19 +56,10 @@ async def main():
     solo_worker = Worker(solo_params)
     # Step 3: Organize tasks
     
-    async def task(query_set:QuerySet):
-        query_set_name = query_set.get_path()
-        output_path=f"eval_result-{query_set_name.replace('/', '-').replace('\\', "-")}"
-        print(f"Testing: {query_set_name}. Dataset size: {len(query_set)}。")
-        
-        # The dataset contains options, so concatenate options with the question to create an updated temp query set
-        # A "query" key is inserted into each query dict.
-        updated_query = query_set.get_queries()
-        [query.update(
-            {"query": 
-                "\n".join([query["question"], query["A"], query["B"], query["C"], query["D"]])
-                }) for query in updated_query]
-        updated_query_set = QuerySet(updated_query)
+    async def task():        
+        query_set_name = updated_query_set.get_path()
+        output_path=sanitize_pathname(f"eval_result-{query_set_name}")
+        print(f"Testing: {query_set_name}. Dataset size: {len(updated_query_set)}。")
         
         async def subtask(chunk, output_path, query_key):
             responses = await solo_worker(chunk, query_key).invoke()
@@ -76,9 +70,6 @@ async def main():
             subtask_list.append(subtask(chunk, output_path, query_key="query"))
             
         await asyncio.gather(*subtask_list)
-        # result = await deepseek_solo_worker(query_set).invoke()
-        # result.store_to("solo_results_pt.xlsx")
-
     # Step 4: Hit and run!
     await asyncio.gather(task(query_set))
 

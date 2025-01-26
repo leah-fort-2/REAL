@@ -76,10 +76,11 @@ class Worker:
         """
         You are not supposed to directly create a Job instance. Use Worker instance to create one.
         """
-        def __init__(self, worker, query_set_or_template, query_key="query"):
+        def __init__(self, worker, query_set_or_template, query_key="query", response_key="response"):
             self.worker = worker
             self.query_set_or_template = query_set_or_template
             self.query_key = query_key
+            self.response_key = response_key
         
         def __len__(self):
             return len(self.query_set_or_template)
@@ -105,14 +106,14 @@ class Worker:
             
             # Post works
             for query, response in zip(queries, response_list):
-                query.update({"response": response})
-            return ResponseSet(queries)
+                query.update({self.response_key: response})
+            return ResponseSet(queries, self.response_key)
         
     def __init__(self, request_params: RequestParams):
         self.request_params = request_params
         
     def __call__(self, query_set: QuerySet, query_key="query"):
-        return self.Job(self, query_set, query_key)
+        return self.Job(self, query_set, query_key, response_key="response")
         
     def get_params(self):
         return self.request_params.get_params()

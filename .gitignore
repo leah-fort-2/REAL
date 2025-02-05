@@ -5,5 +5,7 @@ __pycache__
 *.xlsx
 *.jsonl
 test_*
-!example_queries.csv
 datasets/*
+!datasets/PUT_DATASETS_HERE
+results/*
+!results/STORE_RESULTS_HERE

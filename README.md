@@ -1,208 +1,113 @@
-# LLM Batch Request Tool
+# REAL
 
-## Usage
+- [About](#about)
+- [Example Usage](#example-usage)
+- [Workflow Orchestration in Adapters](#workflow-orchestration-in-adapters)
+- [Timeout and Batch size](#timeout-and-batch-size)
 
-The tool is designed to conveniently launch concurrent requests to LLM APIs.
+## About
 
-0. **Setup**:
-   - Install the required dependencies:
-     pip install -r requirements.txt
-   - Create `.env` where global settings are saved. A `.env.example` file is provided for your reference. 
+REAL (RESTful Evaluation Automation Layer) is a tool for evaluation LLMs via RESTful APIs. It is designed to be a layer between the LLM api and test datasets.
 
-1. **Prepare Your Input**:
-   - Prepare a CSV or XLSX file with your queries. A demo input file is provided as `example_queries.csv`.
-     - The file has empty cells in its query column. The tool will safely use them as request input while warning the user.
-   - In `run.py`, create `QuerySet` instances that loads your file, or a literal query list.
-    ```py
-    test_queries = QuerySet("example_queries.csv")
+Features:
 
-    # Or
+- **API-based evaluation**: Benchmark LLM performances via any OpenAI-compatible api, in a fashion closer to real-world scenarios.
+- **Workers**: Benchmark tasks are assigned to workers. A worker takes its profile (model name, base url and api key, and model parameters) and conduct batched requests/score judging.
+- **Dataset adapters**: The evaluation logic is encapsulated in adapters, dedicated to meet the requirements of differnt data structures of datasets.
+- **Create adapters**: Customize the evaluation workflow by creating adapters that cater to specific needs.
+- **Evaluation presets**: mmlu/ceval/cmmlu (datasets are not included)
+- **Score judging**: Conduct flexible score judging via response/answer preprocessor chain. CoT? Reflection? Preprocess it.
 
-    literal_queries = [
-                        "What",
-                        "When",
-                        "Why"
-                      ]
-    test_queries = QuerySet(literal_queries)
-    ```
+## Example Usage
 
-2. **Configure the Worker**:
-   - Create `RequestParams` profile with specified parameters if needed.
-     - Omit certain parameters in instantiation to fall back to their global settings.
-    ```py
-    deepseek_params = RequestParams(
-        base_url=DEEPSEEK_BASE_URL,
-        api_key=DEEPSEEK_API_KEY,
-        model="deepseek-chat"
-    )
+REAL starts at `run.py`. To start the first evaluation with REAL, follow the steps:
 
-    # Or, use global settings entirely:
+1. Create an .env file
 
-    default_params = RequestParams()
-    ```
-   - Spawn `Worker` instances. a `Worker` must be initialized with a `RequestParams` profile.
-   - When calling a `Worker` instance with a `QuerySet` instance, you create a `Worker.Job` instance. An optional query column name `query_key` is available when creating a `Job`.
-    > The worker will submit request with only values in `query_key` column. If left blank, the column "`query`" will be used.
-    >
-   - To actually start the `Job`, use `invoke()` on it.
-   ```py
-   deepseek_worker = Worker(deepseek_params)
-   deepseek_job = deepseek_worker(test_queries, query_key="query")
-   # To actually start the job
-   deepseek_job.invoke()
-   ```
-3. **Adjust the workflow to your use case**
-    - Use multiple workers for different test sets
-    - Or use multiple profiles
-    - Or write your own task functions
-    > `Job.invoke(...)` returns `ResponseSet` instance. You can instantiate `ResponseSet` from a list of responses.
-    > ```py
-    > edited_responses = [{"response": "...", "score": 1}, ...]
-    > response_set = ResponseSet(edited_responses)
-    > response_set.get_responses()
-    > # [{"response": "...", "score": 1}, ...]
-    > ```
-   - When you are done, use `store_to` method to export results (append). Only csv and xlsx are supported.
-   ```py
-    responses = await deepseek_job.invoke(test_queries)
-    responses.store_to("deepseek.csv")
-    # Or
-    EditedResponses.store_to("edited_responses.csv")
-   ```
+Look at .env.example which has all the required env variables. Duplicate it, create a `.env`, and fill in your own values.
 
-### Example Usage
+2. Prepare a dataset
 
-```py
-# Example usage with deepseek. But you can use any api provider:    
+Take your own datasets. Put it in `datasets` directory (nested directories are supported).
 
-query_set=QuerySet("example_queries.csv")
-# You can use a local list instead
+Currently, REAL supports ceval, cmmlu and mmlu. But theoretically you can use REAL for any MCQ-type dataset.
 
-deepseek_params = RequestParams(
-    base_url=DEEPSEEK_BASE_URL,
-    api_key=DEEPSEEK_API_KEY,
-    model="deepseek-chat"
+You might need to implement your own adapter for other data structures than "[question, a,  b, c, d, answer]". But trust, it's not that difficult. Keep reading for how an adapter is used in REAL architecture.
+
+3. Create a worker @`run.py`
+
+A worker takes a `RequestParams` instance which is its profile. It will `invoke` requests following this profile.
+
+4. Call an adapter @`run.py`
+
+An adapter wraps the evaluation logic and takes 1) the dataset directory 2) the worker 3) the results dir (for where to store responses) 4) score output path (for storing the metrics to a file) and 5) test mode (to test only the first subset, used for workflow debug purposes, default to False).
+
+Below is an example of how to use an adapter.
+
+```python
+dataset_path = "path/to/mmlu/dataset"
+
+worker_profile = RequestParams(
+  model="deepseek-chat",
+  temperature=0,
+  max_tokens=128,
+  frequency_penalty=0
+  system_prompt="You are a helpful assistant."
 )
 
-# Create a worker (QuerySet-> ResponseSet)
-deepseek_worker = Worker(deepseek_params)
+industrious_worker = Worker(worker_profile)
 
-async def deepseek_task():
-    result = await deepseek_worker(query_set, query_key="query").invoke()
-    
-    # Note: Will overwrite existing files
-    result.store_to("deepseek.xlsx")
-    
-await asyncio.gather(deepseek_task())
+results_dir = "path/to/results"
+
+score_output_path
+
+await conduct_mmlu(dataset_path, worker, results_dir, score_output_path)
 ```
 
-> For security reasons, it's strongly recommended to set base_url and api_key in a .env file.
-> 
-> An example .env file is provided in the root directory.
+## Workflow Orchestration in Adapters
 
-## Advanced Usage
+An adapter is dedicated to these procedures:
 
-### Multiple workers
+**Pre**
+- Validate dataset and results path, preventing braindead mistakes like FileNotFoundError after 10,000 questions have been evaluated.
 
-Specify each just like you do with one worker.
+**Evaluating**
 
-```py
-async def main():
-    query_set = QuerySet("example_queries.csv")
+- Scrape subset test files (csv/xlsx/jsonl) from the dataset directory using `list_files_in_directory`: `str` -> `str`. An optional file extension criterion can be specified.
+- Create `QuerySet` instance with the path of each subset test file path.
+- Merge dataset fields if needed. Designed for mcq datasets, `QuerySet` implemented `merge_keys` that connects field names/values with linebreakers.
+- Call workers with a `QuerySet` instance and a query field name (which field to request, default to `query`). This creates a `Job`. A `Job` can be `invoke`d to fetch all llm responses and returns them in a `ResponseSet` instance.
+  - Orchestrate multiple workers here.
 
-    deepseek_params = {...}
-    deepseek_worker = Worker(deepseek_params)
+**Post**
 
-    friday_params = {...}
-    friday_worker = Worker(friday_params)
+- Call `ResponseSet` method `store_to` with an output path. (supported format: csv, xlsx, jsonl) Storing full response records is highly advised for archiving purposes.
+- Call `ResponseSet` method `judge` with 1) an answer field, 2) an eval name (for marking each subset record), and 3) response preprocessors before scoring. The `judge` method will return a literal dictionary containing scoring info.
+  - Some preprocessors are ready at `dataset_adapters.response_preprocessors`. 
+- Spawn a `ResponseSet` instance with the judge result dictionary to `store_to` a score output file.
+- Lastly, log the metadata of evaluation(s). Method `log_resultfile` is provided for templated log files.
 
-    # ...
+## Timeout and Batch size
 
-    async def deepseek_task():
-        result = await deepseek_worker(query_set, query_key="query").invoke()
-        result.store_to("deepseek.xlsx")
-        return result
+Since REAL is essentially an augmented batch request tool, it has timeout and batch size settings.
 
-    async def friday_task():
-        result = await friday_worker(query_set, query_key="query").invoke()
-        result.store_to("friday.csv")
-        return result
+- **Timeout**: Happens when a request has not been responded after a given time (timeout). Configure at `api_actions` module.
 
-    # ...
-
-    asyncio.gather(deepseek_task(), friday_task())
+```python
+timeout = ClientTimeout(total=60)  # 1 minute timeout
 ```
 
-### Batch request & Dataset division
+- **Batch size**: When a query set is submitted to an api, its concurrent request number is limited to `BATCH_SIZE` by a semaphore. Configure at .env file.
 
-You can set a `BATCH_SIZE` limit in .env file to limit concurrent request number. (Default = 10)
+NOTE: The semaphore is JOB-SPECIFIC: each job has a semaphore, so 2 jobs invoked at a time can launch `2 * BATCH_SIZE` concurrent requests.
 
-You can also use `divide` method from `QuerySet` instances. This creates a list[QuerySet] you can test with in parcels.
-
-```py
-for div in query_set.divide(10):
-    result = await deepseek_worker(div).invoke()
-    # Note: Will append to existing file
-    result.store_to("deepseek.xlsx")
-```
-Multiple results will append sequentially to the specified file.
-
-### Directly access a request list
-
-It's possible to use process_requests in batch_request module directly.
-It takes a list of string requests and returns a list of string responses.
-
-```py
-from batch_request import process_requests
-
-requests = [
-    "What's the capital of France?",
-    "What is the greatest lake in surface area?",
-    "How many continents are greater in surface area than Asia?"
-    ]
-
-# Provide the parameters in a dict.
-# Required keys: base_url, api_key, model
-# Optional keys: temperature, top_p, max_tokens, frequency_penalty, presence_penalty 
-# The parameters here are not affected by the global settings for functional purity reason.
-# Unspecified optional keys will not be sent.
-responses = process_requests(requests, {...})
-
-print(responses)
-# ["The capital of France is Paris.",
-#  "The largest lake in surface area is the Caspian Sea.",
-#  "There are zero continents greater in surface area than Asia."]
-```
-## Example http request
-
-See request details in api_actions module.
-
-
-Header:
-
-```
-{
-  'Authorization': 'Bearer [Your API Key]',
-  'Content-Type': 'application/json'
-}
+```bash
+BATCH_SIZE=5
 ```
 
-Body: 
-
-```
-{
-  'messages':
-    [
-      {
-      'role': 'user', 
-      'content': "What's the name of the first bridge in the world? "
-      }
-    ],
-  'model': 'deepseek-chat', 
-  'temperature': 0.0, 
-  'top_p': 1.0, 
-  'frequency_penalty': 0.0, 
-  'presence_penalty': 0.0, 
-  'max_tokens': 8192
-}
+```python
+job1 = worker(dataset_1, "question").invoke()
+# This has a semaphore of 5
+job2 = worker(dataset_2, "Question").invoke()
+# Also has a semaphore of 5
 ```

@@ -1,7 +1,8 @@
-from csv_manager import store_to_csv, read_from_csv
-from xlsx_manager import store_to_excel, read_from_excel
-from jsonl_manager import store_to_jsonl, read_from_jsonl
+from io_managers.csv_manager import store_to_csv, read_from_csv
+from io_managers.xlsx_manager import store_to_excel, read_from_excel
+from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
 import copy
+import os
 
 class QuerySet:
     def __init__(self, file_path_or_query_list, field_names=[]):
@@ -161,6 +162,10 @@ class ResponseSet:
     def store_to(self, file_path):
         if not file_path.endswith('.csv') and not file_path.endswith('.xlsx'):
             raise ValueError(f"Storing to unsupported file format: \"{file_path}\". Please use CSV or XLSX.")
+        
+        dirname = os.path.dirname(file_path)
+        if dirname != "" and not os.path.isdir(dirname):
+            os.makedirs(dirname)
         if file_path.endswith('.csv'):
             store_to_csv(file_path, self.responses)
         elif file_path.endswith('.xlsx'):

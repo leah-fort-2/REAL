@@ -12,7 +12,9 @@ load_dotenv()
 
 BASE_URL = os.getenv("BASE_URL")
 API_KEY = os.getenv("API_KEY")
-MODEL = "deepseek-chat"
+BACKUP_URL = "http://192.168.1.9:6007/v1"
+MODEL = "deepseek-r1-distill-qwen-32b-exl2-4.5bpw"
+# Change: timeout 60s => 144s in api_actions; mcq_preprocessor => mcq_cot_preprocessor in dataset_adapters.preset_proprocesssors; add break in adapters
 DATASET_NAME = "ceval"
 DATASET2_NAME = "cmmlu"
 DATASET3_NAME = "mmlu"
@@ -32,21 +34,21 @@ async def main():
         base_url=BASE_URL,
         api_key=API_KEY,
         model=MODEL,
-        max_tokens=128,
+        max_tokens=2048,
         system_prompt=make_ceval_system_prompt()
     )
     cmmlu_worker_profile = RequestParams(
         base_url=BASE_URL,
         api_key=API_KEY,
         model=MODEL,
-        max_tokens=128,
+        max_tokens=2048,
         system_prompt=make_cmmlu_system_prompt()
     )
     mmlu_worker_profile = RequestParams(
-        base_url=BASE_URL,
+        base_url=BACKUP_URL,
         api_key=API_KEY,
         model=MODEL,
-        max_tokens=128,
+        max_tokens=2048,
         system_prompt=make_mmlu_system_prompt()
     )
     
@@ -54,9 +56,17 @@ async def main():
     cmmlu_worker = Worker(cmmlu_worker_profile)
     mmlu_worker = Worker(mmlu_worker_profile)
     
-    await conduct_ceval(DATASET_DIR, ceval_worker, "results/", score_output_path="model_results.xlsx")
-    await conduct_cmmlu(DATASET2_DIR, cmmlu_worker, "results/", score_output_path="model_results.xlsx")
-    await conduct_mmlu(DATASET3_DIR, mmlu_worker, "results/", score_output_path="model_results.xlsx")
+    tasks = [] 
+    async def subtask():
+        await conduct_ceval(DATASET_DIR, ceval_worker, "results/", score_output_path="model_results.xlsx")
+        await conduct_cmmlu(DATASET2_DIR, cmmlu_worker, "results/", score_output_path="model_results.xlsx")
+    
+    tasks.append(subtask())
+    tasks.append(conduct_mmlu(DATASET3_DIR, mmlu_worker, "results/", score_output_path="model_results.xlsx"))
+    
+    await asyncio.gather(*tasks)
+    
+
 
 if __name__ == "__main__":
     asyncio.run(main())

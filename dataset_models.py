@@ -3,6 +3,7 @@ from io_managers.xlsx_manager import store_to_excel, read_from_excel
 from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
 import copy
 import os
+import time
 
 class QuerySet:
     def __init__(self, file_path_or_query_list, field_names=[]):
@@ -105,7 +106,9 @@ class ResponseSet:
         - response_preprocessor: function<str> -> str
         - answer_preprocessor: function<str> -> str
         
-        Meanwhile, add a {eval_name}_score field.
+        Meanwhile, update a {eval_name}_score field to the response set instance.
+        
+        Metrics: accuracy. Compare preprocessed answer and response. On empty preprocessed answer/response, exclude the question from result score and total score.
         
         Return a scoring result with the following entries:
         
@@ -145,8 +148,23 @@ class ResponseSet:
                 preprocessed_response = response_preprocessor(response)
                 preprocessed_answer = answer_preprocessor(correct_answer)
             except Exception:
-                print(f"An error occurred in preprocessing stage: {Exception}")
-                return None
+                # Preprocessing failed, skip the question.
+                print(f"An error occurred in preprocessing stage: {str(Exception)[:50]}... Skip the question.")
+                full_score -= 1
+                continue
+            
+            if preprocessed_answer == "":
+                # No valid answer field. Skip the question.
+                print(f"Parsed invalid answer field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                full_score -= 1
+                continue
+            
+            if preprocessed_response == "":
+                # No valid response field to judge. Skip the question.
+                print(f"Parsed invalid response field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                full_score -= 1
+                continue
+            
             if preprocessed_answer == preprocessed_response:
                 score += 1
                 resp_obj.update({f"{eval_name}_score": 1})
@@ -166,9 +184,26 @@ class ResponseSet:
         dirname = os.path.dirname(file_path)
         if dirname != "" and not os.path.isdir(dirname):
             os.makedirs(dirname)
-        if file_path.endswith('.csv'):
-            store_to_csv(file_path, self.responses)
-        elif file_path.endswith('.xlsx'):
-            store_to_excel(file_path, self.responses)
-        elif file_path.endswith('.jsonl'):
-            store_to_jsonl(file_path, self.responses)
+            
+        # Handle concurrent file writing between jobs. Default: 2 retries, 5 sec interval
+        
+        max_retries = 2 # set max retry count
+        interval = 5 # in seconds
+        retry = 0
+        for _ in range(max_retries + 1): # range has exclusive upper bound
+            try:
+                if file_path.endswith('.csv'):
+                    store_to_csv(file_path, self.responses)
+                elif file_path.endswith('.xlsx'):
+                    store_to_excel(file_path, self.responses)
+                elif file_path.endswith('.jsonl'):
+                    store_to_jsonl(file_path, self.responses)
+                break
+            except IOError:
+                if retry < max_retries:
+                    retry += 1
+                    print(f"Failed to store response results to {file_path}. Retry {retry}/{max_retries} in {interval} second(s)...")
+                    time.sleep(interval)
+                else:
+                    raise IOError(f"Failed to store response results to {file_path} after {max_retries} retries.")
+            

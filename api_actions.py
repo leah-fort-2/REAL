@@ -18,7 +18,8 @@ async def do_request_on(session, request_text, **request_params):
     }
     
     request_body = make_request_body(request_text, **request_params)
-    timeout = ClientTimeout(total=60)  # 1 minute timeout
+    TIMEOUT_SECS = 144 # Set timeout
+    timeout = ClientTimeout(total=TIMEOUT_SECS)
     max_attempts = 3
 
     for attempt in range(max_attempts):
@@ -35,7 +36,7 @@ async def do_request_on(session, request_text, **request_params):
                         
         except asyncio.TimeoutError:
             if attempt < max_attempts:
-                logger.warning(f"API request timed out after 60 seconds. Attempt {attempt + 1} of {max_attempts}")
+                logger.warning(f"API request timed out after {TIMEOUT_SECS} seconds. Attempt {attempt + 1} of {max_attempts}")
                 await asyncio.sleep(1)  # Wait for 1 second before retrying
             else:
                 logger.error(f"API request timed out after {max_attempts} attempts")

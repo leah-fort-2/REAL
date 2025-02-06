@@ -2,8 +2,9 @@ import os
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
 from dataset_adapters.pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
-from dataset_adapters.preset_preprocessors import mcq_preprocessor
+from dataset_adapters.preset_preprocessors import mcq_cot_preprocessor
 from dataset_adapters.resultfile_logger import log_resultfile
+import asyncio
 
 async def conduct_ceval(dataset_dir: str, worker: Worker, results_dir: str, score_output_path="model_results.xlsx", test_mode=False):
     """
@@ -32,14 +33,18 @@ async def conduct_ceval(dataset_dir: str, worker: Worker, results_dir: str, scor
     
     async def task(query_set: QuerySet):
         response_set = await worker(query_set, "question").invoke()
-        response_set.store_to(craft_result_path(query_set, results_dir, DATASET_NAME, MODEL))
+        
         subset_path = query_set.get_path()
         # this get_path method can return None when query_set is instantiated with a literal query string list. However, this wouldn't happen in dataset evaluation. No need for None safety validation.
 
         # Use query set path basename as eval name as each subset should have its distinctive name.
         score_result = response_set.judge(answer_key="answer", 
                                           eval_name=f"{parse_filename_from_path(subset_path)}", 
-                                          response_preprocessor = mcq_preprocessor)
+                                          response_preprocessor = mcq_cot_preprocessor)
+        
+        # Store response with score info updated in response_set
+        response_set.store_to(craft_result_path(query_set, results_dir, DATASET_NAME, MODEL))
+
         score_result.update({"dataset": DATASET_NAME, "model": MODEL})
         ResponseSet([score_result]).store_to(score_output_path)
         
@@ -61,6 +66,10 @@ async def conduct_ceval(dataset_dir: str, worker: Worker, results_dir: str, scor
         print(f"Conducting test: {dataset.get_path()} ({dataset_size})")
         # Task pool has been deprecated. Execute tasks synchronously. Each task is still done asynchronously with batch_size in .env file.
         await task(dataset)
+        
+        # Very long haul! Add 120 sec break
+        await asyncio.sleep(120)
+
             
     # Initialize a RESULTFILE in evaluation results directory.
     def log():

@@ -10,6 +10,12 @@ import re
 
 THINK_FAILED_MSG = "Thinking process failed."
 
+def as_is(response: str):
+    """
+    No preprocessing, no validation, just "as-is".
+    """
+    return response
+
 def mcq_preprocessor(response: str):
     """
     Simple mcq preprocessor that uses the first letter then uppercase it: " A. answer" => "A"
@@ -62,12 +68,57 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
     return preprocess_pipeline(response, 
                                remove_think_tags,
                                catch_bad_cot_then_strip_with_fallback)
+    
+def model_binary_scoring_cot_preprocessor(response: str) -> str:
+    """
+    Parse a binary score from a scoring cot model message into a string. e.g. "1" "0"
+    
+    On failure to parse, return "".
+    """
+    # Parse a scoring model message into a binary int score.
+    state = remove_think_tags(response)
+    if state == THINK_FAILED_MSG:
+        return ""
+    state = strip_whitespace_then_asterisk_then_last_number(state)
+    if state not in ["1", "0"]:
+        return ""
+    return state
+
+def model_binary_scoring_preprocessor(response: str) -> str:
+    """
+    Binary score parsing for non-cot model.
+    
+    On failure to parse, return "".
+    """
+    first_char = strip_then_use_first_character(response)
+    if first_char.isdigit():
+        return first_char
+    last_char = strip_then_use_last_character(response)
+    if last_char.isdigit():
+        return last_char
+    return ""    
 
 def strip_then_use_first_letter_then_uppercase(s: str):
     # Remove non-alphabetical characters
     state=re.sub("[^A-Za-z]", "", s)
     try:
         return state.strip()[0].upper()
+    except IndexError:
+        # e.g. " " => "" => no [0] can be retrieved
+        return ""
+
+def strip_then_use_first_character(s: str):
+    state=re.sub("\\s", "", s)
+    try:
+        return state.strip()[0]
+    except IndexError:
+        # e.g. " " => "" => no [0] can be retrieved
+        return ""
+
+def strip_then_use_last_character(s: str):
+    state=re.sub("\\s", "", s)
+    try:
+        return state.strip()[-1]
     except IndexError:
         # e.g. " " => "" => no [0] can be retrieved
         return ""
@@ -81,6 +132,16 @@ def strip_whitespace_then_asterisk_then_last_letter_then_uppercase(s: str):
         # e.g. " " => "" => no [-1] can be retrieved
         return ""
 
+def strip_whitespace_then_asterisk_then_last_number(s: str):
+    # Remove non-numeric characters
+    state=re.sub("[^\\d]", "", s)
+    try:
+        last_char = state.strip().replace("*", "").rstrip()[-1]
+        return last_char if last_char.isdigit() else ""
+    except IndexError:
+        # e.g. " " => "" => no [-1] can be retrieved
+        return ""
+    
 def search_for_answer(s: str):
     pattern = f"[Aa]nswer:.*?([A-Da-d])"
     match = re.search(pattern, s, flags=re.DOTALL)
@@ -111,10 +172,16 @@ def preprocess_pipeline(str_to_preprocess: str, *preprocessors: list):
         return ""
     return state
 
+
 if __name__ == "__main__":
-    msg = "<think>blahblahblah"
-    print(mcq_cot_preprocessor(msg))
-    print(mcq_cot_preprocessor_for_bad_if(msg))
-    msg2 = "<think>blah</think>bae."
-    print(mcq_cot_preprocessor(msg2))
-    print(mcq_cot_preprocessor_for_bad_if(msg2))
+    msg = """
+    <think>
+Okay, 
+1
+    """
+    print(model_binary_scoring_cot_preprocessor(msg))
+    
+    msg2="1"
+    
+    print(model_binary_scoring_preprocessor(msg2))
+    print(model_binary_scoring_preprocessor(msg))

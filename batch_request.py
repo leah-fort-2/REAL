@@ -22,7 +22,14 @@ async def process_requests(request_list: list[str], **request_params):
         responses = await asyncio.gather(*tasks)
     return responses
 
+FALLBACK_ERR_MSG = "Unknown error in processing request"
+
 async def process_single_request(session, semaphore, request, **request_params):
+    """
+    Delegate api request and content parsing. Returns a message content string.
+    
+    Will catch common api errors and content parsing errors, but with unhandled errors, will return a fallback message.
+    """
     async with semaphore:
         try:
             if request == "":
@@ -36,7 +43,7 @@ async def process_single_request(session, semaphore, request, **request_params):
                 return content
             else:
                 logger.error(f"Failed to process request: {request[:50]}... Response: {response}")
-                return None
+                return FALLBACK_ERR_MSG
         except Exception as e:
             logger.error(f"Error processing request: {request[:50]}... Error: {str(e)}")
-            return None
+            return FALLBACK_ERR_MSG

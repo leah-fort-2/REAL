@@ -1,9 +1,12 @@
 from io_managers.csv_manager import store_to_csv, read_from_csv
 from io_managers.xlsx_manager import store_to_excel, read_from_excel
 from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
+from text_preprocessors import as_is
+from judgers.presets import STRICT, JUDGE_FAILED_MSG
 import copy
 import os
 import time
+
 
 class QuerySet:
     def __init__(self, file_path_or_query_list, field_names=[]):
@@ -85,14 +88,15 @@ class QuerySet:
         return updated_query_set
     
 class ResponseSet:
-    def __init__(self, response_list: list[dict], response_key=None):
+    def __init__(self, response_list: list[dict], query_key=None, response_key=None):
         """
         You should not instantiate this class directly unless you know what you are doing.
-        Optional: Mark response_key field names
-        You can safely ignore this if score judging isn't needed. 
+        Optional: Mark query_key field name. Safely ignore this if score judging isn't needed.
+        Optional: Mark response_key field names. Safely ignore this if score judging isn't needed. 
         """
         self.responses = response_list
         self.response_key=response_key
+        self.query_key=query_key
         
     def get_responses(self):
         return self.responses
@@ -100,17 +104,18 @@ class ResponseSet:
     def __len__(self):
         return len(self.responses)
     
-    def judge(self, answer_key="answer", eval_name="Evaluation", response_preprocessor=None, answer_preprocessor=None):
+    def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT):
         """
-        Conduct score judging using the specified answer field with optional preprocessing.
+        Conduct a [0,1] acc score judging using specified answer field with optional context, preprocessing and judger method. On empty preprocessed answer/response, exclude the question from result score and total score. Return a literal score dictionary.
         - response_preprocessor: function<str> -> str
+          - Preprocess the response before submitting to the judger method. e.g. mcq_preprocessor, etc. see text_preprocessors module.
         - answer_preprocessor: function<str> -> str
+          - Similar to response
+        - judger: function<str, str, context=None> -> float
+          - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score. Default to STRICT.
+          - If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
         
-        Meanwhile, update a {eval_name}_score field to the response set instance.
-        
-        Metrics: accuracy. Compare preprocessed answer and response. On empty preprocessed answer/response, exclude the question from result score and total score.
-        
-        Return a scoring result with the following entries:
+        Score dictionary structure
         
         - eval_name: the evaluation name specified -> str
         - score: the number of correct answers -> int
@@ -128,15 +133,19 @@ class ResponseSet:
         
         if answer_key not in list(self.responses[0].keys()):
             print(f"Error: Evaluation {eval_name}'s answer_key {answer_key} does not seem to be an existing field.")
+            return None
             
         if self.response_key not in list(self.responses[0].keys()):
             print(f"Error: Evaluation {eval_name}'s response_key {self.response_key} does not seem to be an existing field.")
-        
-        if response_preprocessor == None:
-            response_preprocessor = lambda r: r
+            return None
             
-        if answer_preprocessor == None:
-            answer_preprocessor = lambda r: r
+        # If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
+        if context_key != None:
+            if context_key not in list(self.responses[0].keys()):
+                print(f"Error: Evaluation {eval_name}'s optional context_key {context_key} does not seem to be an existing field.")
+                return None
+        elif self.query_key != None:
+                context_key = self.query_key
         
         score = 0
         full_score = len(self)
@@ -144,6 +153,10 @@ class ResponseSet:
         for resp_obj in self.responses:
             response = f"{resp_obj[self.response_key]}".strip()
             correct_answer = f"{resp_obj[answer_key]}".strip()
+            # Add None check, because query_key is for providing context to model_scoring. You can still do STRICT judging without query text.
+            context = ""  if context_key == None else f"{resp_obj[context_key]}".strip()
+            
+            # For each question, do preprocessings first.
             try:
                 preprocessed_response = response_preprocessor(response)
                 preprocessed_answer = answer_preprocessor(correct_answer)
@@ -153,6 +166,7 @@ class ResponseSet:
                 full_score -= 1
                 continue
             
+            # Skip questions with empty answer/response.
             if preprocessed_answer == "":
                 # No valid answer field. Skip the question.
                 print(f"Parsed invalid answer field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
@@ -165,11 +179,17 @@ class ResponseSet:
                 full_score -= 1
                 continue
             
-            if preprocessed_answer == preprocessed_response:
-                score += 1
-                resp_obj.update({f"{eval_name}_score": 1})
-            else:
-                resp_obj.update({f"{eval_name}_score": 0})
+            # Score judging algorithm.
+            response_score: float = judger(preprocessed_answer, preprocessed_response, context = context)
+            
+            if response_score == JUDGE_FAILED_MSG:
+                # Score judging failed. Skip the question. Most likely stemming from model scoring.
+                print(f"Score judging failed. Skipped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                full_score -=1
+                continue
+            
+            score += response_score
+            resp_obj.update({f"{eval_name}_score": response_score})
                 
         print(
             f"======\nEvaluation Report:\nEvaluation Name: {eval_name}\nAccuracy: {score}/{full_score} ({round(100*score/full_score, 1)}%)\n======\n")
@@ -205,5 +225,6 @@ class ResponseSet:
                     print(f"Failed to store response results to {file_path}. Retry {retry}/{max_retries} in {interval} second(s)...")
                     time.sleep(interval)
                 else:
-                    raise IOError(f"Failed to store response results to {file_path} after {max_retries} retries.")
+                    raise IOError(f"Failed to store response results to 
+                                  {file_path} after {max_retries} retries.")
             

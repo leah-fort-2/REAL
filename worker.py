@@ -76,17 +76,17 @@ class Worker:
         """
         You are not supposed to directly create a Job instance. Use Worker instance to create one.
         """
-        def __init__(self, worker, query_set_or_template, query_key="query", response_key="response"):
+        def __init__(self, worker, query_set: QuerySet, query_key: str, response_key: str):
             self.worker = worker
-            self.query_set_or_template = query_set_or_template
+            self.query_set = query_set
             self.query_key = query_key
             self.response_key = response_key
         
         def __len__(self):
-            return len(self.query_set_or_template)
+            return len(self.query_set)
         
         def get_query_set(self):
-            return self.query_set_or_template
+            return self.query_set
         
         def get_worker(self):
             return self.worker
@@ -94,26 +94,32 @@ class Worker:
         async def invoke(self):
             worker = self.worker
             query_key = self.query_key
+            response_key = self.response_key
             # queries: list({query_key: <query_str>})
-            queries = self.query_set_or_template.get_queries()
+            queries = self.query_set.get_queries()
             
             # Acquire a query string list
-            query_list = [query[query_key] for query in queries]
+            query_string_list = [query[query_key] for query in queries]
             
             # Launch requests
             params = worker.get_params()
-            response_list = await process_requests(query_list, **params)
+            response_list = await process_requests(query_string_list, **params)
             
             # Post works
             for query, response in zip(queries, response_list):
-                query.update({self.response_key: response})
-            return ResponseSet(queries, self.response_key)
+                query.update({response_key: response})
+            return ResponseSet(queries, response_key, query_key)
         
     def __init__(self, request_params: RequestParams):
         self.request_params = request_params
         
-    def __call__(self, query_set: QuerySet, query_key="query"):
-        return self.Job(self, query_set, query_key, response_key="response")
+    def __call__(self, query_set: QuerySet, query_key="query", response_key="response"):
+        """
+        Create a job with the specified query_key and response_key.
+        
+        Default: query_key = "query",  response_key = "response"
+        """
+        return self.Job(self, query_set, query_key, response_key)
         
     def get_params(self):
         return self.request_params.get_params()

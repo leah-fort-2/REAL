@@ -1,9 +1,9 @@
 import os
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
-from dataset_adapters.pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
-from dataset_adapters.preset_preprocessors import mcq_cot_preprocessor
-from dataset_adapters.resultfile_logger import log_resultfile
+from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
+from text_preprocessors import mcq_cot_preprocessor
+from resultfile_logger import log_resultfile
 import asyncio
 
 async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir: str, score_output_path="model_results.xlsx", test_mode=False):

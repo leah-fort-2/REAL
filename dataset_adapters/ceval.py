@@ -10,18 +10,15 @@ async def conduct_ceval(dataset_dir: str, worker: Worker, results_dir: str, scor
     """
     Conduct a ceval test. Before evaluation, create a worker instance.
     
-    - dataset_dir: The dataset should have the following directory structure: 
+    :params dataset_dir: The dataset should have the following directory structure: 
     
     `$DATASET_NAME$ > $SUBSET_NAME$`
     as in `ceval/accountant.csv`
     - Evaluation format supported: depend on ResponseSet.store_to method
     
-    - results_dir: Store evaluation results in this directory. e.g. results/ceval/athene-v2-chat/test-athene-v2-chat-accountant.xlsx
-    
-    - score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
-    
-    - Test mode: only the first subset under dataset_dir will be evaluated. Only for debug purposes.
-    
+    :params results_dir: Store evaluation results in this directory. e.g. results/ceval/athene-v2-chat/test-athene-v2-chat-accountant.xlsx
+    :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
+    :params test_mode: only the first subset under dataset_dir will be evaluated. Only for debug purposes.
     """
     DATASET_NAME = "ceval"
     MODEL = worker.get_params()["model"]

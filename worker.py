@@ -1,4 +1,4 @@
-from batch_request import process_requests
+from request_manager.request_manager import process_batch
 from dataset_models import QuerySet, ResponseSet
 
 import os
@@ -22,14 +22,16 @@ DEFAULT_PROMPT_SUFFIX = os.getenv("PROMPT_SUFFIX")
 class RequestParams:
     """
         Request parameters for OpenAI compatible APIs. If not specified, use global settings in .env file.
-        - api_url
-        - api_key
-        - model
-        - temperature
-        - max_tokens
-        - top_p
-        - frequency_penalty
-        - presence_penalty        
+        
+        - :base_url:
+        - :api_url:
+        - :api_key:
+        - :model:
+        - :temperature:
+        - :max_tokens:
+        - :top_p:
+        - :frequency_penalty:
+        - :presence_penalty:
     """
     def __init__(self, 
                  base_url=DEFAULT_BASE_URL, 
@@ -44,6 +46,22 @@ class RequestParams:
                  prompt_prefix=DEFAULT_PROMPT_PREFIX,
                  prompt_suffix=DEFAULT_PROMPT_SUFFIX
                  ):
+        """
+        Create a request parameter instance for initializing a worker. On unspecified parameters, use global settings in .env file.
+        
+        :params base_url: Base url for OpenAI compatible APIs. e.g. `https://api.openai.com/v1`
+        :params api_key: API key for OpenAI compatible APIs.
+        :params model: The model to request to.
+        :params temperature: Temperature parameter.
+        :params top_p: Top P parameter.
+        :params max_tokens: Max tokens to generate per request before cutoff.
+        :params frequency_penalty: Frequency penalty parameter.
+        :params presence_penalty: Presence penalty parameter.
+        :params system_prompt: A system prompt text with `role: "system"`
+        :params prompt_prefix: Prefix to prepend to requests
+        :params prompt_suffix: Suffix to append to requests
+
+        """
         self.api_url = base_url + "/chat/completions"
         self.api_key = api_key
         self.model = model
@@ -57,6 +75,11 @@ class RequestParams:
         self.prompt_suffix = prompt_suffix
         
     def get_params(self):
+        """
+        Return the parameters to initialize this request parameter instance. Modifying it does not affect internal parameters.
+        
+        :return dict[str, Any]:
+        """
         return {
             "api_url": self.api_url,
             "api_key": self.api_key,
@@ -86,12 +109,23 @@ class Worker:
             return len(self.query_set)
         
         def get_query_set(self):
+            """
+            :return Queryset query_set: The very QuerySet object to start this job.
+            
+            """
             return self.query_set
         
         def get_worker(self):
+            """
+            :return Worker worker: The very Worker object to start this job.
+
+            """
             return self.worker
         
         async def invoke(self):
+            """
+            Start this job.
+            """
             worker = self.worker
             query_key = self.query_key
             response_key = self.response_key
@@ -103,7 +137,7 @@ class Worker:
             
             # Launch requests
             params = worker.get_params()
-            response_list = await process_requests(query_string_list, **params)
+            response_list = await process_batch(query_string_list, params)
             
             # Post works
             for query, response in zip(queries, response_list):
@@ -115,11 +149,19 @@ class Worker:
         
     def __call__(self, query_set: QuerySet, query_key="query", response_key="response"):
         """
-        Create a job with the specified query_key and response_key.
+        Create a `Job` instance with specified query_key and response_key. Call `invoke()` to start when needed.
         
-        Default: query_key = "query",  response_key = "response"
+        :params QuerySet query_set: The query set to evaluate with.
+        :params str query_key: Field to evaluate in the query set. Default to "query".
+        :params str response_key: Field to store response to. Default to "response".
+        :return Job: A job instance.
+
         """
         return self.Job(self, query_set, query_key, response_key)
         
     def get_params(self):
+        """
+        :return dict[str, Any]: The parameters to initialize this worker. Modifying this dict does not affect the worker.
+ 
+        """
         return self.request_params.get_params()

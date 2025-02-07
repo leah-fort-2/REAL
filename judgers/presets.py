@@ -1,17 +1,17 @@
 """
-Preset judger methods for comparing a response with a correct answer.
+Preset judger methods (synchronous) for comparing a response with a correct answer.
 
 Takes two strings and an optional context string, outputs a [0, 1] float score describing accuracy.
 
 Does not care about preprocessing. That is delegated to preprocessor module.
 """
 
-from judgers.model_judge import model_scoring
+from judgers.model_binary_judge import model_scoring
 
 # A failed flag used in score judging module in dataset_model
 JUDGE_FAILED_MSG = "Judge failed."
 
-def STRICT(response:str, answer:str, context="") -> float :
+def STRICT_MATCH(response:str, answer:str, context="") -> float :
     """
     Strictly compare response and answer. No context.
     
@@ -123,7 +123,7 @@ def EDIT_DISTANCE_RATIO(response: str, answer: str, context="") -> float:
     
     return 1 - operation_matrix[ROWS][COLUMNS] / max(ROWS, COLUMNS)
 
-def MODEL_SCORING(response: str, answer: str, context="") -> float:
+def MODEL_SCORING(response: str, answer: str, context="") -> float | str:
     """
     Score response with a judge model.
     
@@ -133,4 +133,4 @@ def MODEL_SCORING(response: str, answer: str, context="") -> float:
     
     if score == "":
         return JUDGE_FAILED_MSG
-    return score
+    return float(score)

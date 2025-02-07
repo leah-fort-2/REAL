@@ -9,6 +9,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def do_request_on(session, request_text, **request_params):
+    """
+    Send post request to OAI api in async fashion. An aiohttp session is managed externally.
+    
+    :params session:  an aiohttp.ClientSession object
+    :params request_text:  a single request string sent to API
+    :param request_params: Request parameters in body e.g. temperature
+    :return: Coroutine -> response dict | None
+    """
     API_URL = request_params["api_url"]
     API_KEY = request_params["api_key"]
     
@@ -62,6 +70,12 @@ async def do_request_on(session, request_text, **request_params):
     return None  # This line should never be reached, but it's here for completeness
     
 def make_request_body(request_str, **request_params):
+    """
+    Construct the request body.
+    
+    :params request_str:  a single request string sent to API
+    :params request_params: Request parameters in body e.g. temperature
+    """
     MODEL = request_params["model"]
     params = {"model": MODEL}
     float_params = ["temperature", "top_p", "frequency_penalty", "presence_penalty"]
@@ -83,6 +97,14 @@ def make_request_body(request_str, **request_params):
     return request
 
 def extract_content(OAI_response):
+    """
+    :params OAI_response: response dict from an OpenAI compatible API. Should be structured as:
+    ```{'choices': [
+            {'message': 
+                {'content': '...'}
+            }]
+        }
+    """
     try:
         return OAI_response['choices'][0]['message']['content']
     except (TypeError, KeyError, IndexError):
@@ -90,7 +112,16 @@ def extract_content(OAI_response):
         return ''
     
 def extract_content_with_reasoning(o1_response):
-    # Reasoning content? 
+    """
+    :params o1_response: response dict from an OAI API with `reasoning_content` output. Should be structured as:
+    ```{'choices': [
+            {'message': 
+                {
+                    'reasoning_content': '...',
+                    'content': '...'}
+            }]
+        }
+    """ 
     try:
         reasoning_content = o1_response['choices'][0]['message']['reasoning_content']
         reasoning_content = "\n".join([f"> {line}" for line in reasoning_content.split("\n")])

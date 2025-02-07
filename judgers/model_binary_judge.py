@@ -1,8 +1,7 @@
 from dotenv import load_dotenv
 import os
 import asyncio
-from worker import Worker, RequestParams
-from dataset_models import QuerySet
+from request_manager.request_manager import single_request
 from text_preprocessors import model_binary_scoring_cot_preprocessor, model_binary_scoring_preprocessor
 
 load_dotenv()
@@ -10,7 +9,7 @@ load_dotenv()
 def make_judge_prompt():
     return "You are an high-level exam judge. You will be provided with a response text, a question text and a list of reference answer candidates, all of which are regarded as acceptable. Do not output anything other than a numeric score.\nScoring standards:\n- Either 1 (=correct) or 0 (=not correct)\n- To score as 1, the response must\n  > unambiguously bear correct answer(s), meanwhile\n  > does not include incorrect information.\n- Partial incorrectness = 0 (=incorrect). No mid value.\n- Repetition don't count as incorrect. Response truncation (last line cuts off) is safely ignored. Non-essential extra details in response text doesn't affect rating.\n- Unintelligible response = 0 (=incorrect)."
 
-scoring_worker_parameters = {"base_url": None,
+scoring_parameters = {"base_url": None,
                             "api_key": None,
                             "model": None,
                             "temperature": 0,
@@ -28,19 +27,15 @@ def model_scoring(response:str, answer: str, context: str):
     validate_scoring_api_base_url()
     validate_scoring_api_key()
     
-    scoring_worker_parameters.update({
+    scoring_parameters.update({
         "model": os.getenv("SCORING_MODEL"),
         "base_url": os.getenv("SCORING_API_BASE_URL"),
         "api_key": os.getenv("SCORING_API_KEY")
         })
     
-    scoring_worker_profile = RequestParams(**scoring_worker_parameters)
-    scoring_worker = Worker(scoring_worker_profile)
+    scoring_query = make_scoring_query(response, answer, context)
     
-    scored_data = [{"query": make_scoring_query(response, answer, context)}]
-    scored_set = QuerySet(scored_data)
-    
-    scoring_result:dict = asyncio.run(scoring_worker(scored_set, query_key="query", response_key="response").invoke()).get_responses()[0]
+    scoring_result:str = asyncio.run(single_request(scoring_query, scoring_parameters))
     # Reminder: The function is None safe. If the api request failed, a FALLBACK_ERR_MSG is returned.
     scoring_message = scoring_result["response"]
     

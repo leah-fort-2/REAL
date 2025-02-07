@@ -2,17 +2,20 @@ from io_managers.csv_manager import store_to_csv, read_from_csv
 from io_managers.xlsx_manager import store_to_excel, read_from_excel
 from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
 from text_preprocessors import as_is
-from judgers.presets import STRICT, JUDGE_FAILED_MSG
+from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
 import copy
 import os
 import time
 
 
 class QuerySet:
-    def __init__(self, file_path_or_query_list, field_names=[]):
-        """Leave field names empty if you wish to keep all fields
+    def __init__(self, file_path_or_query_list: str | list[dict] | list[str], field_names=[]):
+        """
+        Create a query set. After instantiation, the query set is read only.
         
-        Accept a data file path or a query string list.
+        :params str | list[dict] | list[str] file_path_or_query_list: a data file path,  a query object list, or a query string list.
+        :params field_names:  a list of field names to read from the file. If empty, all fields are read.
+        
         """
         if isinstance(file_path_or_query_list, str):
             # A path to the query file is provided
@@ -41,20 +44,32 @@ class QuerySet:
         return len(self.queries)
     
     def get_path(self):
+        """
+        :return: path to the query set file. If instantiated from a list, return None.
+        """
         return self.file_path
     
     def get_queries(self):
+        """
+        :return: a deepcopy of the query object list. Modifying this list does not affect the original query set.
+
+        """
         return copy.deepcopy(self.queries)
     
     def get_query_list(self, query_key="query"):
-        return [query[query_key] for query in self.queries]
+        """
+        :return:  a list of query strings. Modifying this list does not affect the original query set.
+
+        """
+        return [query[query_key] for query in self.get_queries()]
     
     def divide(self, division_size=10):
-        """Split an entire query set into divisions with remainders e.g. [10, 10, 10, 5]. 
+        """
+        Split an entire query set into divisions with remainders e.g. `[10, 10, 10, 5]`. Subsets inherit all fields and file path from the parent set. 
         
-        Subsets inherit all fields and file path from the parent set. 
-        
-        Returns (less than or equal to) division-sized query set."""
+        :params division_size: Maximum size of each subset
+        :return: (less than or equal to) division-sized query subset.
+        """
         
         def spawn_subset(queries_chunk, path):
             subset = QuerySet(queries_chunk)
@@ -68,6 +83,11 @@ class QuerySet:
         Create a new QuerySet where specified keys are merged into a new key. The merged fields are concatenated with line breakers (\\n). The original QuerySet remains unchanged.
         
         A typical use case is to merge question and options into a single field for MCQ-type dataset evaluation.  
+        
+        :params key_list_to_merge: a list of keys to merge into the new key. The order of keys in the list is preserved in the merged field.
+        :params merged_key_name: the name of the new key. If the key already exists, it will be overwritten.
+        :params with_key_names: whether to include key names in the merged field. e.g. `Field1: Value1\\nField2: Value2` vs `Value1\\nValue2`. Default to True.
+
         """
         updated_query = self.get_queries()
         
@@ -91,36 +111,49 @@ class ResponseSet:
     def __init__(self, response_list: list[dict], query_key=None, response_key=None):
         """
         You should not instantiate this class directly unless you know what you are doing.
-        Optional: Mark query_key field name. Safely ignore this if score judging isn't needed.
-        Optional: Mark response_key field names. Safely ignore this if score judging isn't needed. 
+        :params query_key: Optional. Only for score judging.
+        :params response_key: Optional. Only for score judging. 
         """
         self.responses = response_list
         self.response_key=response_key
         self.query_key=query_key
         
     def get_responses(self):
+        """
+        Returns the very list[dict] containing response objects.
+        :return: the response list.
+
+        """
         return self.responses
     
     def __len__(self):
         return len(self.responses)
     
-    def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT):
+    def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT_MATCH):
         """
-        Conduct a [0,1] acc score judging using specified answer field with optional context, preprocessing and judger method. On empty preprocessed answer/response, exclude the question from result score and total score. Return a literal score dictionary.
-        - response_preprocessor: function<str> -> str
-          - Preprocess the response before submitting to the judger method. e.g. mcq_preprocessor, etc. see text_preprocessors module.
-        - answer_preprocessor: function<str> -> str
-          - Similar to response
-        - judger: function<str, str, context=None> -> float
+        Conduct a [0,1] acc score judging using specified answer field with optional context, preprocessing and judger method. Failed judgings are ignored. Return a scoring dictionary.
+        
+        - :side effects: Modifies self.responses by adding a new field "score"
+        
+        :params answer_key: Specify the field name for answer. Default to "answer"
+        :params context_key: Optional. Specify the field name for context. Default to None. If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
+        :params eval_name: Name bound to eval records ONLY in this judging. e.g. "accountant_val" "agronomy". Default to "Evaluation"
+        :params (str -> str) response_preprocessor:
+
+          - Preprocess the response before submitting to the judger method. e.g. `mcq_preprocessor`, etc. Default to `as_is`. See text_preprocessors module. 
+          
+        :params (str -> str) answer_preprocessor:
+          - Same as response, but for answer.
+        :params ((response:str, answer:str, context=str) -> str) judger:
+        
           - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score. Default to STRICT.
-          - If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
-        
-        Score dictionary structure
-        
-        - eval_name: the evaluation name specified -> str
-        - score: the number of correct answers -> int
-        - full_score: the total number of questions -> int
-        - accuracy: the accuracy rate -> float
+
+        :return dict<str, Any>: A score dictionary with following fields:
+
+        - :eval_name: the evaluation name specified -> str
+        - :score: the number of correct answers -> int
+        - :full_score: the total score with failed judging excluded -> int
+        - :accuracy: final score / full score -> float
         
         """
         if self.response_key == None:
@@ -198,6 +231,12 @@ class ResponseSet:
 
     
     def store_to(self, file_path):
+        """
+        Store (append) results to file.
+        
+        :params file_path: The path to store the results. Support CSV, XLSX and JSONL format.
+
+        """
         if not file_path.endswith('.csv') and not file_path.endswith('.xlsx'):
             raise ValueError(f"Storing to unsupported file format: \"{file_path}\". Please use CSV or XLSX.")
         

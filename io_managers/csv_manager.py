@@ -1,7 +1,12 @@
 import csv
 import os
 
-def store_to_csv(filename, data_list):
+def store_to_csv(filename: str, data_list: list[dict]):
+    """
+    :params filename: path to the csv file
+    :params list[dict] data_list: list of dictionaries to be written to the csv file
+    :return: None
+    """
     if not data_list:
         return
     
@@ -16,6 +21,14 @@ def store_to_csv(filename, data_list):
             writer.writerow(row)
 
 def read_from_csv(filename, fields=[]):
+    """
+    :params filename: path to the csv file
+    :params list[str] fields: list of fields to read. If empty, all fields are read
+    :return list[dict]:
+    :raise ValueError: if no record is read from the file
+    :raise FileNotFoundError: if the file is not found
+
+    """
     data_list = []
     try:
         with open(filename, 'r', encoding="utf-8") as csvfile:

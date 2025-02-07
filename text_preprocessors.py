@@ -18,18 +18,18 @@ def as_is(response: str):
 
 def mcq_preprocessor(response: str):
     """
-    Simple mcq preprocessor that uses the first letter then uppercase it: " A. answer" => "A"
+    Simple mcq preprocessor that uses the first letter then uppercase it
+    
+    e.g. ` A. answer` => `A`
     """
     return preprocess_pipeline(response, 
                                strip_then_use_first_letter_then_uppercase)
 
 def mcq_cot_preprocessor(response: str):
     """
-    Incomplete cot => THINK_FAILED_MSG ("Thinking process failed.")
-    
-    Regular => The first letter uppercased: "A. answer" => "A"
-    
-    Valid cot but Empty conclusion => ""
+    - :Incomplete cot: THINK_FAILED_MSG (`Thinking process failed.`)
+    - :Regular: The first letter uppercased `A. answer` => `A`
+    - :Valid cot but Empty conclusion: ""
     """
     def catch_bad_cot_or_fallback(s: str):
         if s == THINK_FAILED_MSG:
@@ -43,15 +43,15 @@ def mcq_cot_preprocessor(response: str):
     
 def mcq_cot_preprocessor_for_bad_if(response:str):
     """
-    Incomplete cot => THINK_FAILED_MSG ("Thinking process failed.")
+    - :Incomplete cot: THINK_FAILED_MSG ("Thinking process failed.")
     
-    Regular => The last alphabetical character uppercased: "The correct answer is: A." => "A"
+    - :Regular: The last alphabetical character uppercased `The correct answer is: A.` => `A`
     
-    Last letter is not among A/B/C/D => Try search /Answer: [A-Da-d]/: "Answer: D\nThe correct answer" => "D"
+    - :Last letter is not among A/B/C/D: Try search `/Answer: [A-Da-d]/`: `Answer: D\\nThe correct answer` => `D`
     
-    No match => ""
+    - :No match: ""
     
-    Valid cot but Empty conclusion => ""
+    - :Valid cot but Empty conclusion: ""
     """
     
     def catch_bad_cot_then_strip_with_fallback(s: str):
@@ -159,7 +159,7 @@ def remove_think_tags(s: str):
         return THINK_FAILED_MSG
     return removed
     
-def preprocess_pipeline(str_to_preprocess: str, *preprocessors: list):
+def preprocess_pipeline(str_to_preprocess: str, *preprocessors):
     """
     Execute a series of preprocessors with empty string detection.
     """

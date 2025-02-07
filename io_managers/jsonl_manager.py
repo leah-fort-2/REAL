@@ -5,9 +5,10 @@ from typing import List, Dict
 def store_to_jsonl(filename: str, data_list: List[Dict]):
     """
     Append data to a JSONL file.
-    Args:
-        filename (str): Path to the JSONL file.
-        data_list (List[Dict]): List of dictionaries to be written to the file.
+    
+    :params str filename: Path to the JSONL file.
+    :params list[dict] data_list: List of dictionaries to be written to the file.
+    :return: None
     """
     if not data_list:
         return
@@ -21,16 +22,11 @@ def read_from_jsonl(filename: str, fields: List[str] = []) -> List[Dict]:
     """
     Read data from a JSONL file.
 
-    Args:
-        filename (str): Path to the JSONL file.
-        fields (List[str], optional): List of fields to read. If empty, all fields are read.
-
-    Returns:
-        List[Dict]: A list of dictionaries, where each dictionary represents a JSON object from the file.
-
-    Raises:
-        FileNotFoundError: If the file doesn't exist.
-        ValueError: If no data is found for the specified fields or the file is empty.
+    :params str filename: Path to the JSONL file.
+    :params list[str] fields: List of fields to read. If empty, all fields are read.
+    :return List[Dict]: A list of dictionaries, where each dictionary represents a JSON object from the file.
+    :raise ValueError: If no data is found for the specified fields or the file is empty.
+    :raise FileNotFoundError: If the file doesn't exist.
     """
     if not os.path.exists(filename):
         raise FileNotFoundError(f"File \"{filename}\" not found. You are likely to read from a non-existent file.")

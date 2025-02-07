@@ -1,6 +1,11 @@
 import openpyxl
 
-def store_to_excel(excel_filename, data_list):
+def store_to_excel(excel_filename: str, data_list: list[dict]):
+    """
+    :params str excel_filename: Path to the Excel file
+    :params list[dict] data_list: List of dictionaries to be written to the file
+    :return: None
+    """
     if not data_list:
         return
     
@@ -34,6 +39,11 @@ def store_to_excel(excel_filename, data_list):
     workbook.save(excel_filename)
 
 def read_from_excel(excel_filename, fields=[]):
+    """
+    :params str excel_filename: Path to the Excel file
+    :params list[str] fields: List of fields to read. If empty, all fields are read
+
+    """
     try:
         workbook = openpyxl.load_workbook(excel_filename)
         worksheet = workbook.active

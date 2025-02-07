@@ -58,11 +58,11 @@ async def main():
     
     tasks = [] 
     async def subtask():
-        await conduct_ceval(DATASET_DIR, ceval_worker, "results/", score_output_path="model_results.xlsx")
-        await conduct_cmmlu(DATASET2_DIR, cmmlu_worker, "results/", score_output_path="model_results.xlsx")
+        await conduct_ceval(DATASET_DIR, ceval_worker)
+        await conduct_cmmlu(DATASET2_DIR, cmmlu_worker)
     
     tasks.append(subtask())
-    tasks.append(conduct_mmlu(DATASET3_DIR, mmlu_worker, "results/", score_output_path="model_results.xlsx"))
+    tasks.append(conduct_mmlu(DATASET3_DIR, mmlu_worker))
     
     await asyncio.gather(*tasks)
     

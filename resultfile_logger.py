@@ -27,7 +27,15 @@ from datetime import datetime
 from worker import Worker
 from io_managers.raw_file_writer import write_to_file
 
-def log_resultfile(dataset_name, worker: Worker, eval_dir: str):
+def log_resultfile(dataset_name, worker: Worker, log_dir: str):
+    """
+    Write a `RESULTFILE` to the specified directory. Append.
+    
+    :params str dataset_name: The dataset name to be logged.
+    :params Worker worker: A worker instance. Its parameters will be logged as evaluation parameters.
+    :params str log_dir: Where to store the log file.
+
+    """
     # Default values
     default_values = {
         'date': datetime.now().strftime('%m-%d-%Y'),
@@ -72,7 +80,7 @@ test_set_name: {final_values['test_set_name']}
 test_set_type: {final_values['test_set_type']}
 judging_method: {final_values['judging_method']}"""
     
-    resultfile_path = f"{eval_dir}/RESULTFILE"
+    resultfile_path = f"{log_dir}/RESULTFILE"
     
     def log_msg():
         print(f"A RESULTFILE for {dataset_name} has been initialized at: {resultfile_path}.")
@@ -81,7 +89,7 @@ judging_method: {final_values['judging_method']}"""
         print(f"Failed to initialize RESULTFILE for {dataset_name} at {resultfile_path}. The target evaluation directory likely does not exist.")
         
     # Write the RESULTFILE content to the specified file
-    if os.path.isdir(eval_dir):
+    if os.path.isdir(log_dir):
         write_to_file(resultfile_path, resultfile_content)
         log_msg()
     else:

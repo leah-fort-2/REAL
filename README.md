@@ -83,6 +83,29 @@ Read through to learn how to customize an adapter. An adapter is dedicated to th
 - Spawn a `ResponseSet` instance with the judge result dictionary to `store_to` a score output file.
 - Lastly, log the metadata of evaluation(s). Method `log_resultfile` is provided for templated log files.
 
+```mermaid
+flowchart LR
+    subgraph Adapter
+    direction LR
+    C((Start)) -->|Validate| D[Paths]
+    C -->|Scrape| E[Subset Test Files]
+    E -->|Create| F[QuerySet]
+    F -->|Merge Fields| G[Merged QuerySet]
+    G --> H[Job]
+    H -->|Invoke| I[ResponseSet]
+    I -->|Store| J[Result File]
+    I -->|Judge| K[Score]
+    K -->|Store| L[Score Output File]
+    C -->|Log| M[Metadata]
+    end
+    A[/Dataset Path<br/>Required/] --> |use|C
+    B[/Worker<br/>Required/] --> |call|H
+    N((("Results dir<br/>Default: results"))) --> |use|J
+    O((("Score output path<br/>Default: model_results.xlsx")))-->|use|L
+    P((("Test mode<br/>Default: False"))) --> |toggle|H
+
+```
+
 ## Timeout and Batch size
 
 Since REAL is essentially an augmented batch request tool, it has timeout and batch size settings.

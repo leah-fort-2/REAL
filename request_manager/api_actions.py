@@ -102,6 +102,11 @@ def make_request_body(request_str, **request_params):
     params = {"model": MODEL}
     float_params = ["temperature", "top_p", "frequency_penalty", "presence_penalty"]
     int_params = ["max_tokens"]
+
+    if "temperature" in request_params and "top_p" in request_params:
+        logger.info(f"Detect temperature {request_params['temperature']} and top_p {request_params['top_p']}. top_p is ignored. To use top_p sampling, set temperature as blank or specify it as None in request_params.")
+        params.pop("top_p", None)
+    
     params.update({key: float(request_params[key]) for key in float_params if key in request_params})
     params.update({key: int(request_params[key]) for key in int_params if key in request_params})
     

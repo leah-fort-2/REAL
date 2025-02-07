@@ -30,6 +30,7 @@ REAL starts at `run.py`. To start the first evaluation with REAL, follow the ste
 > You might need to implement your own adapter for dataset structures other than the typical mcq structure `[question, a,  b, c, d, answer]`. Keep reading for how an adapter is used in REAL architecture.
 
 2. **Create a worker @`run.py`** :A worker takes a `RequestParams` instance which is its profile. It will `invoke` requests following this profile.
+> If you wish to not use certain parameters, either 1) leave them as blank in .env file, or 2) explicitly use `None` at runtime. e.g. Avoid top_p when using temperature.
 
 3. **Call an adapter @`run.py`**: An adapter wraps the evaluation logic and takes
     - **the dataset directory**

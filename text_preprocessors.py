@@ -7,6 +7,10 @@ When empty string is encountered at any stage of the pipeline, the workflow is h
 """
 
 import re
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 THINK_FAILED_MSG = "Thinking process failed."
 
@@ -146,7 +150,7 @@ def search_for_answer(s: str):
     pattern = f"[Aa]nswer:.*?([A-Da-d])"
     match = re.search(pattern, s, flags=re.DOTALL)
     if match == None:
-        print(f"Failed to parse answer from response: {s[:50]}")
+        logger.error(f"Failed to parse answer from response: {s[:50]}")
         return ""
     return match.group(1).upper()
     
@@ -155,7 +159,7 @@ def remove_think_tags(s: str):
     
     # If no cot is parsed at all, return a fallback message string.
     if len(removed) == len(s):
-        print(f"Encountered malformed cot section. The cot is likely incomplete. Will fall back to think failed msg.")
+        logger.warning(f"Encountered malformed cot section. The cot is likely incomplete. Will fall back to think failed msg.")
         return THINK_FAILED_MSG
     return removed
     
@@ -168,7 +172,7 @@ def preprocess_pipeline(str_to_preprocess: str, *preprocessors):
         if state != "":
             state = func(state)
             continue
-        print("Encountered empty response. It's likely the model returned an empty response!")
+        logger.warning("Encountered empty response. It's likely the model returned an empty response!")
         return ""
     return state
 

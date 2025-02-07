@@ -6,7 +6,10 @@ from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
 import copy
 import os
 import time
+import logging
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class QuerySet:
     def __init__(self, file_path_or_query_list: str | list[dict] | list[str], field_names=[]):
@@ -30,7 +33,7 @@ class QuerySet:
                 self.queries = read_from_jsonl(file_path_or_query_list, field_names)
         elif len(file_path_or_query_list)==0:
             # The provided query list is empty
-            print(f"Empty set encountered on {file_path_or_query_list}.")
+            logger.warning(f"Empty set encountered on {file_path_or_query_list}.")
         elif isinstance(file_path_or_query_list[0], dict):
             # A query dictionary is provided as is
             self.file_path = None
@@ -157,25 +160,25 @@ class ResponseSet:
         
         """
         if self.response_key == None:
-            print(f"Error: The evaluation {eval_name} does not have response_key specified. Unable to proceed with score judging.")
+            logger.error(f"The evaluation {eval_name} does not have response_key specified. Unable to proceed with score judging.")
             return None
         
         if len(self.responses) == 0:
-            print(f"Warning: The evaluation {eval_name} has an empty response set.")
+            logger.warning(f"The evaluation {eval_name} has an empty response set.")
             return None
         
         if answer_key not in list(self.responses[0].keys()):
-            print(f"Error: Evaluation {eval_name}'s answer_key {answer_key} does not seem to be an existing field.")
+            logger.error(f"Evaluation {eval_name}'s answer_key {answer_key} does not seem to be an existing field.")
             return None
             
         if self.response_key not in list(self.responses[0].keys()):
-            print(f"Error: Evaluation {eval_name}'s response_key {self.response_key} does not seem to be an existing field.")
+            logger.error(f"Evaluation {eval_name}'s response_key {self.response_key} does not seem to be an existing field.")
             return None
             
         # If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
         if context_key != None:
             if context_key not in list(self.responses[0].keys()):
-                print(f"Error: Evaluation {eval_name}'s optional context_key {context_key} does not seem to be an existing field.")
+                logger.error(f"Evaluation {eval_name}'s optional context_key {context_key} does not seem to be an existing field.")
                 return None
         elif self.query_key != None:
                 context_key = self.query_key
@@ -195,20 +198,20 @@ class ResponseSet:
                 preprocessed_answer = answer_preprocessor(correct_answer)
             except Exception:
                 # Preprocessing failed, skip the question.
-                print(f"An error occurred in preprocessing stage: {str(Exception)[:50]}... Skip the question.")
+                logger.error(f"An error occurred in preprocessing stage: {str(Exception)[:50]}... Skip the question.")
                 full_score -= 1
                 continue
             
             # Skip questions with empty answer/response.
             if preprocessed_answer == "":
                 # No valid answer field. Skip the question.
-                print(f"Parsed invalid answer field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Parsed invalid answer field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 full_score -= 1
                 continue
             
             if preprocessed_response == "":
                 # No valid response field to judge. Skip the question.
-                print(f"Parsed invalid response field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Parsed invalid response field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 full_score -= 1
                 continue
             
@@ -217,15 +220,15 @@ class ResponseSet:
             
             if response_score == JUDGE_FAILED_MSG:
                 # Score judging failed. Skip the question. Most likely stemming from model scoring.
-                print(f"Score judging failed. Skipped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Score judging failed. Skipped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 full_score -=1
                 continue
             
             score += response_score
             resp_obj.update({f"{eval_name}_score": response_score})
                 
-        print(
-            f"======\nEvaluation Report:\nEvaluation Name: {eval_name}\nAccuracy: {score}/{full_score} ({round(100*score/full_score, 1)}%)\n======\n")
+        logger.info(
+            f"\n======\nEvaluation Report:\nEvaluation Name: {eval_name}\nAccuracy: {score}/{full_score} ({round(100*score/full_score, 1)}%)\n======\n")
 
         return {"eval_name": eval_name, "score": score, "full_score": full_score, "accuracy": score/full_score}
 
@@ -261,7 +264,7 @@ class ResponseSet:
             except IOError:
                 if retry < max_retries:
                     retry += 1
-                    print(f"Failed to store response results to {file_path}. Retry {retry}/{max_retries} in {interval} second(s)...")
+                    logger.error(f"Failed to store response results to {file_path}. Retry {retry}/{max_retries} in {interval} second(s)...")
                     time.sleep(interval)
                 else:
                     raise IOError(f"Failed to store response results to {file_path} after {max_retries} retries.")

@@ -26,6 +26,10 @@ import os
 from datetime import datetime
 from worker import Worker
 from io_managers.raw_file_writer import write_to_file
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def log_resultfile(dataset_name, worker: Worker, log_dir: str):
     """
@@ -83,10 +87,10 @@ judging_method: {final_values['judging_method']}"""
     resultfile_path = f"{log_dir}/RESULTFILE"
     
     def log_msg():
-        print(f"A RESULTFILE for {dataset_name} has been initialized at: {resultfile_path}.")
+        logger.info(f"A RESULTFILE for {dataset_name} has been initialized at: {resultfile_path}.")
         
     def log_failed_msg():
-        print(f"Failed to initialize RESULTFILE for {dataset_name} at {resultfile_path}. The target evaluation directory likely does not exist.")
+        logger.error(f"Failed to initialize RESULTFILE for {dataset_name} at {resultfile_path}. The target evaluation directory likely does not exist.")
         
     # Write the RESULTFILE content to the specified file
     if os.path.isdir(log_dir):

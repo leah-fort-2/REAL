@@ -10,11 +10,11 @@ load_dotenv()
 DEFAULT_BASE_URL = os.getenv("BASE_URL")
 DEFAULT_API_KEY = os.getenv("API_KEY")
 DEFAULT_MODEL = os.getenv("MODEL_NAME")
-DEFAULT_TEMPERATURE = float(os.getenv("TEMPERATURE"))
-DEFAULT_TOP_P = float(os.getenv("TOP_P"))
-DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS"))
-DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))
-DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))
+DEFAULT_TEMPERATURE = float(os.getenv("TEMPERATURE")) if os.getenv("TEMPERATURE") else None
+DEFAULT_TOP_P = float(os.getenv("TOP_P"))  if os.getenv("TOP_P") else None
+DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS"))  if os.getenv("MAX_TOKENS") else None
+DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))  if os.getenv("FREQUENCY_PENALTY") else None
+DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))  if os.getenv("PRESENCE_PENALTY") else None
 DEFAULT_SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT")
 DEFAULT_PROMPT_PREFIX = os.getenv("PROMPT_PREFIX")
 DEFAULT_PROMPT_SUFFIX = os.getenv("PROMPT_SUFFIX")
@@ -27,9 +27,9 @@ class RequestParams:
         - :api_url:
         - :api_key:
         - :model:
-        - :temperature:
+        - :temperature: It's advised to not use temperature and top_p at the same time.
         - :max_tokens:
-        - :top_p:
+        - :top_p: It's advised to not use temperature and top_p at the same time.
         - :frequency_penalty:
         - :presence_penalty:
     """
@@ -47,13 +47,13 @@ class RequestParams:
                  prompt_suffix=DEFAULT_PROMPT_SUFFIX
                  ):
         """
-        Create a request parameter instance for initializing a worker. On unspecified parameters, use global settings in .env file.
+        Create a request parameter instance for initializing a worker. On unspecified parameters, use global settings in .env file. Use None to explicitly ignore a parameter.
         
         :params base_url: Base url for OpenAI compatible APIs. e.g. `https://api.openai.com/v1`
         :params api_key: API key for OpenAI compatible APIs.
         :params model: The model to request to.
-        :params temperature: Temperature parameter.
-        :params top_p: Top P parameter.
+        :params temperature: Temperature parameter. It's advised to not use temperature and top_p at the same time.
+        :params top_p: Top P parameter. It's advised to not use temperature and top_p at the same time.
         :params max_tokens: Max tokens to generate per request before cutoff.
         :params frequency_penalty: Frequency penalty parameter.
         :params presence_penalty: Presence penalty parameter.
@@ -80,7 +80,7 @@ class RequestParams:
         
         :return dict[str, Any]:
         """
-        return {
+        params = {
             "api_url": self.api_url,
             "api_key": self.api_key,
             "model": self.model,
@@ -93,6 +93,7 @@ class RequestParams:
             "prompt_prefix": self.prompt_prefix,
             "prompt_suffix": self.prompt_suffix
         }
+        return {k: v for k, v in params.items() if v is not None}
         
 class Worker:
     class Job:

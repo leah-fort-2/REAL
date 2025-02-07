@@ -51,7 +51,7 @@ async def conduct_mmlu(dataset_dir: str, worker: Worker, results_dir: str, score
     if test_mode:
         datasets = [datasets[0]]
     
-    for subset_path in datasets:
+    for i, subset_path in enumerate(datasets):
         # The original ceval test set contains 5 mcp fields. Need to merge them into one.
         raw_dataset = QuerySet(subset_path)
         # Keys are merged into a question field, overwriting the existing field
@@ -64,7 +64,9 @@ async def conduct_mmlu(dataset_dir: str, worker: Worker, results_dir: str, score
         await task(dataset)
         
         # Very long haul! Add 120 sec break
-        await asyncio.sleep(120)
+        # However, no need to break after the last task.
+        if i < len(datasets) - 1:
+            await asyncio.sleep(120)
 
     
     # Initialize a RESULTFILE in evaluation results directory.

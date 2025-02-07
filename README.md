@@ -106,17 +106,23 @@ flowchart LR
 
 ```
 
-## Timeout and Batch size
+## Timeout, max attempts and Batch size
 
-Since REAL is essentially an augmented batch request tool, it has timeout and batch size settings.
+Since REAL is essentially an augmented batch request tool, it has these connection settings. Configure them at .env file.
 
-- **Timeout**: Happens when a request has not been responded after a given time (timeout). Configure at `request_manager.api_actions` module.
+- **Timeout**: Happens when a request has not been responded after a given time (timeout).
 
-```python
-TIMEOUT_SECS = 60  # 1 minute timeout
+```bash
+TIMEOUT=60  # 1 minute timeout
 ```
 
-- **Batch size**: When a query set is submitted to an api, its concurrent request number is limited to `BATCH_SIZE` by a semaphore. Configure at .env file.
+- **Max attempts**: When api request encountered errors, REAL will retry for this many times.
+
+```bash
+MAX_ATTEMPTS=3
+```
+
+- **Batch size**: When a query set is submitted to an api, its concurrent request number is limited to `BATCH_SIZE` by a semaphore. 
 
 NOTE: The semaphore is JOB-SPECIFIC: each job launches a process_batch which has a semaphore, so 2 jobs invoked at a time can launch `2 * BATCH_SIZE` concurrent requests.
 

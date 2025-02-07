@@ -142,7 +142,7 @@ class Worker:
             # Post works
             for query, response in zip(queries, response_list):
                 query.update({response_key: response})
-            return ResponseSet(queries, response_key, query_key)
+            return ResponseSet(queries, query_key=query_key, response_key=response_key)
         
     def __init__(self, request_params: RequestParams):
         self.request_params = request_params

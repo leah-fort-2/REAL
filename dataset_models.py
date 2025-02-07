@@ -264,6 +264,4 @@ class ResponseSet:
                     print(f"Failed to store response results to {file_path}. Retry {retry}/{max_retries} in {interval} second(s)...")
                     time.sleep(interval)
                 else:
-                    raise IOError(f"Failed to store response results to 
-                                  {file_path} after {max_retries} retries.")
-            
+                    raise IOError(f"Failed to store response results to {file_path} after {max_retries} retries.")

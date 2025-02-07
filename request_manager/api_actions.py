@@ -3,8 +3,14 @@ import logging
 import asyncio
 from aiohttp import ClientTimeout
 from aiohttp import ClientTimeout, ClientError
+import dotenv
+import os
 
-# Configure logging
+dotenv.load_dotenv()
+
+TIMEOUT = int(os.getenv("TIMEOUT", 144))
+MAX_ATTEMPTS = int(os.getenv("MAX_ATTEMPTS", 3))
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -26,45 +32,61 @@ async def do_request_on(session, request_text, **request_params):
     }
     
     request_body = make_request_body(request_text, **request_params)
-    TIMEOUT_SECS = 144 # Set timeout
-    timeout = ClientTimeout(total=TIMEOUT_SECS)
-    max_attempts = 3
+    timeout = ClientTimeout(total=TIMEOUT)
 
-    for attempt in range(max_attempts):
+
+    for attempt in range(MAX_ATTEMPTS):
         try:
             async with session.post(API_URL, json=request_body, headers=headers, timeout=timeout) as response:
                 if response.status == 200:
-                    return await response.json()
-                if attempt < max_attempts: 
-                    logger.warning(f"API request failed with status {response.status}. Response: {await response.text()}. Attempt {attempt + 1} of {max_attempts}")
-                    await asyncio.sleep(1)  # Wait for 1 second before retrying
+                    body = await response.json()
+                    if body != None:
+                        return body
+                    
+                    # Server-side issue, returns empty body with 200 code
+                    if attempt < MAX_ATTEMPTS:
+                        logger.warning(f"API returned 200 but with empty response body. Response: {await response.text()}.  Attempt {attempt + 1} of {MAX_ATTEMPTS}")
+                    else:
+                        logger.error(f"API returned 200 but with empty response body. Response: {await response.text()}")
+                        return None
+                
+                # Non 200 code
                 else:
-                    logger.error(f"API request failed with status {response.status}. Response: {await response.text()}")
-                    return None
-                        
+                    if attempt < MAX_ATTEMPTS: 
+                        logger.warning(f"API request failed with status {response.status}. Response: {await response.text()}. Attempt {attempt + 1} of {MAX_ATTEMPTS}")
+                        await asyncio.sleep(1)  # Wait for 1 second before retrying
+                    else:
+                        logger.error(f"API request failed with status {response.status}. Response: {await response.text()}")
+                        return None
+        
+        # Request timeout
         except asyncio.TimeoutError:
-            if attempt < max_attempts:
-                logger.warning(f"API request timed out after {TIMEOUT_SECS} seconds. Attempt {attempt + 1} of {max_attempts}")
+            if attempt < MAX_ATTEMPTS:
+                logger.warning(f"API request timed out after {TIMEOUT} seconds. Attempt {attempt + 1} of {MAX_ATTEMPTS}")
                 await asyncio.sleep(1)  # Wait for 1 second before retrying
             else:
-                logger.error(f"API request timed out after {max_attempts} attempts")
+                logger.error(f"API request timed out after {MAX_ATTEMPTS} attempts")
                 return None
+        
+        # Client Error
         except ClientError as e:
-            if attempt < max_attempts:
-                logger.warning(f"API request error: {str(e)}. Attempt {attempt + 1} of {max_attempts}")
+            if attempt < MAX_ATTEMPTS:
+                logger.warning(f"API request error: {str(e)}. Attempt {attempt + 1} of {MAX_ATTEMPTS}")
             else:
-                logger.error(f"API request failed after {max_attempts} attempts")
+                logger.error(f"API request failed after {MAX_ATTEMPTS} attempts")
             return None
+        
+        # Unknown error
         except Exception as e:
             logger.error(f"An error occurred during the API request: {str(e)}")
-            if attempt < max_attempts:
-                logger.warning(f"API request failed with status {response.status}. Response: {await response.text()}. Attempt {attempt + 1} of {max_attempts}")
+            if attempt < MAX_ATTEMPTS:
+                logger.warning(f"API request failed with status {response.status}. Response: {await response.text()}. Attempt {attempt + 1} of {MAX_ATTEMPTS}")
             else:
-                logger.error(f"API request failed after {max_attempts} attempts")
+                logger.error(f"API request failed after {MAX_ATTEMPTS} attempts")
                 return None
     
         # Wait before retrying
-        if attempt < max_attempts:
+        if attempt < MAX_ATTEMPTS:
             await asyncio.sleep(1)
     
     return None  # This line should never be reached, but it's here for completeness
@@ -93,6 +115,9 @@ def make_request_body(request_str, **request_params):
     request = {"messages": messages}
     for key, value in params.items():
         request[key] = value
+        
+    # Patch in 2.1.2: Forbid stream output
+    request.update({"stream": False})
     
     return request
 

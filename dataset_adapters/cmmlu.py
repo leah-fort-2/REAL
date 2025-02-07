@@ -2,7 +2,7 @@ import os
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
 from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
-from text_preprocessors import mcq_cot_preprocessor
+from text_preprocessors import mcq_preprocessor
 from resultfile_logger import log_resultfile
 import asyncio
 
@@ -37,7 +37,7 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
         # Use query set path basename as eval name as each subset should have its distinctive name.
         score_result = response_set.judge(answer_key="Answer", 
                                           eval_name=f"{parse_filename_from_path(subset_path)}",
-                                          response_preprocessor = mcq_cot_preprocessor)
+                                          response_preprocessor = mcq_preprocessor)
         
         # Store response with score info updated in response_set
         response_set.store_to(craft_result_path(query_set, results_dir, DATASET_NAME, MODEL))

@@ -3,10 +3,7 @@ from dataset_models import QuerySet, ResponseSet
 from pathfinders import parse_filename_from_path, sanitize_pathname
 import os
 
-# Specify which key to query. Default to "query".
-QUERY_KEY="query"
-
-async def batch_query(query_file_path: str, workers: list[Worker], output_dir="results/batch_query", test_mode=False):
+async def batch_query(query_file_path: str, workers: list[Worker], output_dir="results/batch_query", query_key="query", test_mode=False):
     """
     Conduct a naive batch query without score judging. 
     
@@ -25,8 +22,7 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
     if not os.path.isdir(output_dir):
         raise FileNotFoundError(f"Destination results directory is not found: {output_dir}")
     
-    # Example file contains an MCQ test set. Need to merge the question and options into one query.
-    query_set = QuerySet(query_file_path).merge_keys([QUERY_KEY, "A", "B", "C", "D"], QUERY_KEY)
+    query_set = QuerySet(query_file_path)
         
     if test_mode:
         query_set = query_set[:10]
@@ -38,7 +34,7 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
     for i, worker in enumerate(workers):
         model_name = worker.get_params()["model"]
         model_response_key = f"{model_name}_response"
-        response_set = await worker(query_set, query_key=QUERY_KEY, response_key=model_response_key).invoke()
+        response_set = await worker(query_set, query_key=query_key, response_key=model_response_key).invoke()
         response_list = response_set.get_responses()
         if i == 0:
             # First job, initialize response list, no need to aggregate
@@ -48,11 +44,11 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
             # Sequential update on existing job response set
             [existing_item.update(
                 {
-                    model_response_key: aggregating_item[QUERY_KEY]  
+                    model_response_key: aggregating_item[query_key]  
                 }
                 ) for existing_item, aggregating_item in zip(aggregated_response_list, response_list)]
             
-    aggregated_response_set = ResponseSet(aggregated_response_list, query_key=QUERY_KEY)
+    aggregated_response_set = ResponseSet(aggregated_response_list, query_key=query_key)
     
     output_path = os.path.join(output_dir, sanitize_pathname(f"{QUERY_SET_NAME}_responses.xlsx"))
     

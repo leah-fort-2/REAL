@@ -22,31 +22,45 @@ def as_is(response: str):
 
 def mcq_preprocessor(response: str):
     """
-    Simple mcq preprocessor that uses the first letter then uppercase it
+    Simple mcq preprocessor that uses the first letter if independent, then uppercase it.
+    
+    An independent letter has no adjacent alphanumeric characters. A well-formated MCQ response starts with and only contains a letter "A-D". Containing formatting, at least the first alphabetical character as independent (`**A**` is possible).
     
     e.g. ` A. answer` => `A`
+    `Unknown error in connection` => ""
     """
+    
     return preprocess_pipeline(response, 
-                               strip_then_use_first_letter_then_uppercase)
+                               pick_first_letter_if_independent,
+                               lambda s: s.upper(),
+                               filter_bad_option_letters)
 
 def mcq_cot_preprocessor(response: str):
     """
+    Similar to a regular mcq preprocessor, but add cot truncation and bad cot handling.
+    
     - :Incomplete cot: THINK_FAILED_MSG (`Thinking process failed.`)
-    - :Regular: The first letter uppercased `A. answer` => `A`
     - :Valid cot but Empty conclusion: ""
+    - :Otherwise: as in mcq_preprocessor
     """
-    def catch_bad_cot_or_fallback(s: str):
+    def _catch_bad_cot_pipeline(s: str):
+        # On bad cot, immediately return fallback message. Otherwise same as in mcq_preprocessor
         if s == THINK_FAILED_MSG:
             # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
             return THINK_FAILED_MSG
-        return strip_then_use_first_letter_then_uppercase(s)
+        return preprocess_pipeline(s, 
+                                   pick_first_letter_if_independent,
+                                   lambda s: s.upper(),
+                                   filter_bad_option_letters)
     
     return preprocess_pipeline(response, 
                                remove_think_tags, 
-                               catch_bad_cot_or_fallback)
+                               _catch_bad_cot_pipeline)
     
 def mcq_cot_preprocessor_for_bad_if(response:str):
     """
+    Similar to mcq_cot_preprocessor, but pick the last letter instead. Applies to models with bad instruction following (stubborn in giving analysis).
+    
     - :Incomplete cot: THINK_FAILED_MSG ("Thinking process failed.")
     
     - :Regular: The last alphabetical character uppercased `The correct answer is: A.` => `A`
@@ -58,20 +72,27 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
     - :Valid cot but Empty conclusion: ""
     """
     
-    def catch_bad_cot_then_strip_with_fallback(s: str):
+    def _catch_bad_cot_then_pick_last_letter(s: str):
+        """
+        These conditional makes the component methods not individually chainable to pipeline:
+        
+        - :THINK_FAILED_MSG input: immediately return the flag
+        
+        - search_for_answer decision upon filter_bad_option_letters
+
+        """
         if s == THINK_FAILED_MSG:
             # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
-            return "Thinking process failed."
+            return THINK_FAILED_MSG
         
-        state = strip_whitespace_then_asterisk_then_last_letter_then_uppercase(s)
-        # e.g.  "Answer: A" -> "A"
-        if state not in ["A", "B", "C", "D"]:
-            state = search_for_answer(s)
-            # e.g. "Answer: A\nThe above is the answer." => "A"
-        return state
+        state = pick_last_letter_if_independent(s).upper()
+        # e.g.  "Answer: B" -> "B" 
+        return state if filter_bad_option_letters(state) else search_for_answer(s)
+        # e.g. "Answer: B\nThe above is the answer." => "B"
+
     return preprocess_pipeline(response, 
                                remove_think_tags,
-                               catch_bad_cot_then_strip_with_fallback)
+                               _catch_bad_cot_then_pick_last_letter)
     
 def model_binary_scoring_cot_preprocessor(response: str) -> str:
     """
@@ -80,13 +101,22 @@ def model_binary_scoring_cot_preprocessor(response: str) -> str:
     On failure to parse, return "".
     """
     # Parse a scoring model message into a binary int score.
-    state = remove_think_tags(response)
-    if state == THINK_FAILED_MSG:
-        return ""
-    state = strip_whitespace_then_asterisk_then_last_number(state)
-    if state not in ["1", "0"]:
-        return ""
-    return state
+    def _catch_bad_cot_pipeline(s: str):
+        # Requires remove_think_tags first
+        if s == THINK_FAILED_MSG:
+            return "" # In scoring, no need to return flag
+        
+        state = pick_first_numbers_if_independent(s)
+        if not filter_non_binary_scores(state):
+            # The first numeric substring is not independent e.g. amici1000
+            # Use last numeric substring
+            last_numeric_substring = pick_last_numbers_if_independent(state)
+            return last_numeric_substring if filter_non_binary_scores(last_numeric_substring) else ""
+        return state
+    
+    return preprocess_pipeline(response, 
+                               remove_think_tags,
+                               _catch_bad_cot_pipeline)
 
 def model_binary_scoring_preprocessor(response: str) -> str:
     """
@@ -94,65 +124,164 @@ def model_binary_scoring_preprocessor(response: str) -> str:
     
     On failure to parse, return "".
     """
-    first_char = strip_then_use_first_character(response)
-    if first_char.isdigit():
-        return first_char
-    last_char = strip_then_use_last_character(response)
-    if last_char.isdigit():
-        return last_char
-    return ""    
+    def _catch_non_binary_score_pipeline(s: str):
+        # Requires pick_first_numbers_if_independent first
+        if not filter_non_binary_scores(s):
+            # The first numeric substring is not independent e.g. amici1000
+            # Use last numeric substring
+            last_numeric_substring = pick_last_numbers_if_independent(s)
+            return last_numeric_substring if filter_non_binary_scores(last_numeric_substring) else ""
+        return s
 
-def strip_then_use_first_letter_then_uppercase(s: str):
-    # Remove non-alphabetical characters
-    state=re.sub("[^A-Za-z]", "", s)
-    try:
-        return state.strip()[0].upper()
-    except IndexError:
-        # e.g. " " => "" => no [0] can be retrieved
-        return ""
+    return preprocess_pipeline(response, 
+                               pick_first_numbers_if_independent, 
+                               _catch_non_binary_score_pipeline)
 
-def strip_then_use_first_character(s: str):
-    state=re.sub("\\s", "", s)
-    try:
-        return state.strip()[0]
-    except IndexError:
-        # e.g. " " => "" => no [0] can be retrieved
-        return ""
-
-def strip_then_use_last_character(s: str):
-    state=re.sub("\\s", "", s)
-    try:
-        return state.strip()[-1]
-    except IndexError:
-        # e.g. " " => "" => no [0] can be retrieved
-        return ""
+def pick_first_letter_if_independent(s: str) -> str:
+    """
+    Pick the first letter if it's independent, otherwise returns "". An improved version of naive `str.strip()[0]` for MCQ responses.
     
-def strip_whitespace_then_asterisk_then_last_letter_then_uppercase(s: str):
-    # Remove non-alphabetical characters
-    state=re.sub("[^A-Za-z]", "", s)
-    try:
-        return state.strip().replace("*", "").rstrip()[-1].upper()
-    except IndexError:
-        # e.g. " " => "" => no [-1] can be retrieved
-        return ""
-
-def strip_whitespace_then_asterisk_then_last_number(s: str):
-    # Remove non-numeric characters
-    state=re.sub("[^\\d]", "", s)
-    try:
-        last_char = state.strip().replace("*", "").rstrip()[-1]
-        return last_char if last_char.isdigit() else ""
-    except IndexError:
-        # e.g. " " => "" => no [-1] can be retrieved
-        return ""
+    An independent letter has no adjacent alphanumeric characters.
     
+    Examples
+    - :A: `A` (typical, independent)
+    - :\\*\\*A\\*\\*: `A` (non-word adjacent characters, still independent)
+    - :$\\boxed{A}$: `A` (boxed formatting, captured and independent)
+    - :3.5\\n A: `A` (not adjacent to a number, still independent)
+    
+    Counter examples
+    - :The correct answer is A.: "" (T has h after it, not independent)
+    - :10A should be the answer. B: "" (A is adjacent to 0, not independent)
+    """
+    
+    unboxed = s.replace("\\boxed", " ")
+    
+    # Pick the first letter with immediately adjacent letters. 
+    # For obvious reason, the previous character should not be alphabatical.
+    pattern = "^[^A-Za-z]*?([^A-Za-z]?)([A-Za-z])(.?)"
+    match = re.search(pattern, unboxed)
+    
+    # None match = no alphabetical characeter found
+    if match != None:
+        # Are adjacent characters alphanumeric?
+        if not match.group(1).isalnum() and not match.group(3).isalnum():
+            return match.group(2)
+        
+    return ""
+
+def pick_last_letter_if_independent(s: str) -> str:
+    """
+    Pick the last letter if it's independent, otherwise returns "". An improved version of naive `str.strip()[-1]` for MCQ responses.
+    
+    An independent letter has no adjacent alphanumeric characters.
+    
+    Examples
+    - :`A`: `A` (typical, independent)
+    - :`**A**`: `A` (non-word adjacent characters, still independent)
+    - :`$\\boxed{A}$`: `A` (boxed formatting - but does not affect matching since we pick the last letter, not the first)
+    - :`Answer: A: 3.5`: `A` (not adjacent to a number, still independent)
+    
+    Counter examples
+    - :This probably needs more clarification.: "" (n has o before it, not independent)
+    - :The most probable cell is A10.: "" (A is adjacent to 1, not independent)
+    """
+
+    # Pick the last letter with immediately adjacent letters.
+    # For obvious reason, the following character should not be alphabatical.
+    pattern = "(.?)([A-Za-z])([^A-Za-z]?)[^A-Za-z]*?$"
+    match = re.search(pattern, s)
+    
+    # None match = no alphabetical characeter found
+    if match != None:
+        # Are adjacent characters alphanumeric?
+        if not match.group(1).isalnum() and not match.group(3).isalnum():
+            return match.group(2)
+        
+    return ""
+
+def pick_first_numbers_if_independent(s: str) -> str:
+    """
+    Pick the first numbers as a substring if it's independent. Support decimal point and "," as separator (removed in output). An improved version of naive `str.strip()[0]` for numeric answer responses.
+    
+    The numeric substring is independent if it does not have adjacent alphabetic characters.
+    
+    Examples:
+    - `Found 3,242 jobs.`: `3242` (typical)
+    - `Untested cases: 3.25%`: `3.25` (percentage is not supported, as it's not parsable by float)
+    - `The string1 is not well written.`: "" (no independent number substring is found.)
+    - "It's a string without any number.": "" (obviously)
+    """
+    
+    # Will match on
+    # - The last numbers with
+    #   - optional percentage mark
+    #   - shrinkable "[0-9]+[,.]" group, as in 1,000,000 where "1," and "000," form two extra groups
+    #   - optional minus sign
+    pattern = "^[^0-9]*?([^0-9]?)(-?([0-9]+[.,])*[0-9]+)([^0-9]?)"
+    match = re.search(pattern, s)
+    
+    # None match = no alphabetical characeter found
+    if match != None:
+        # Are adjacent characters alphabetic?
+        # Group note: in "Score: 2,214,529,240(Highest)"
+        # - group(1) == " "
+        # - group(2) == "2,214,529,240"
+        # - group(3) == "529,"
+        # - group(4) == "("
+        if not match.group(1).isalpha() and not match.group(4).isalpha():
+            return match.group(2).replace(",","")
+    return ""
+
+def pick_last_numbers_if_independent(s: str) -> str:
+    """
+    Pick the last numbers as a substring if it's independent. Support decimal point and "," as separator (removed in output). An improved version of naive `str.strip()[-1]` for numeric answer responses.
+    
+    The numeric substring is independent if it does not have adjacent alphabetic characters.
+    
+    Examples:
+    - `Found 3,242 jobs.`: `3242` (typical)
+    - `Untested cases: 3.25%`: `3.25` (percentage is not supported, as it's not parsable by float)
+    - `The string1 is not well written.`: "" (no independent number substring is found.)
+    - "It's a string without any number.": "" (obviously)
+    """
+    # Will match on
+    # - The last numbers with
+    #   - optional percentage mark
+    #   - shrinkable "[0-9]+[,.]" group, as in 1,000,000 where "1," and "000," form two extra groups
+    #   - optional minus sign
+    pattern = "([^0-9]?)(-?([0-9]+[.,])*[0-9]+)([^0-9]?)[^0-9]*?$"
+    match = re.search(pattern, s)
+    
+    # None match = no alphabetical characeter found
+    if match != None:
+        # Are adjacent characters alphabetic?
+        # Group note: in "Score: 2,214,529,240(Highest)"
+        # - group(1) == " "
+        # - group(2) == "2,214,529,240"
+        # - group(3) == "529,"
+        # - group(4) == "("
+        if not match.group(1).isalpha() and not match.group(4).isalpha():
+            return match.group(2).replace(",","")
+    return ""
+
 def search_for_answer(s: str):
-    pattern = f"[Aa]nswer:.*?([A-Da-d])"
-    match = re.search(pattern, s, flags=re.DOTALL)
-    if match == None:
-        logger.error(f"Failed to parse answer from response: {s[:50]}")
-        return ""
-    return match.group(1).upper()
+    # Remove latex boxed statement e.g. `\boxed{A}`
+    unboxed = s.replace("\\boxed", " ")
+    
+    # Match multiple non-word characters before the first "A-D" character after "Answer:".
+    # Model might use "**A**" or adding arbitrary spaces around the letter.
+    pattern = f"[Aa]nswer:([^\\w]*?)([A-Da-d])"
+    match = re.search(pattern, unboxed)
+    if match != None:
+        return match.group(2).upper()
+        
+    pattern_zh = f"答案[：:]([^\\w]*?)([A-Da-d])"
+    match_zh = re.search(pattern_zh, unboxed)
+    if match_zh != None:
+        return match_zh.group(2).upper()
+
+    logger.error(f"Failed to parse answer from response: {s[:50]}")
+    return ""
     
 def remove_think_tags(s: str):
     removed = re.sub("<[Tt]hink>.*</[Tt]hink>", "", s, flags=re.DOTALL)
@@ -162,6 +291,23 @@ def remove_think_tags(s: str):
         logger.warning(f"Encountered malformed cot section. The cot is likely incomplete. Will fall back to think failed msg.")
         return THINK_FAILED_MSG
     return removed
+
+def filter_bad_option_letters(s: str):
+    """
+    A reverse filter for [A-D].
+    
+    :return: [A-D] or ""
+    """
+    return s if s in "ABCD" else ""
+
+def filter_non_binary_scores(s: str):
+    """
+    A reverse filter for ["0", "1"].
+    
+    :return:  "0" | "1" | ""
+    """
+    
+    return s if s in "01" else ""
     
 def preprocess_pipeline(str_to_preprocess: str, *preprocessors):
     """
@@ -172,20 +318,6 @@ def preprocess_pipeline(str_to_preprocess: str, *preprocessors):
         if state != "":
             state = func(state)
             continue
-        logger.warning("Encountered empty response. It's likely the model returned an empty response!")
+        logger.warning(f"Processed response is empty. Preprocessing halted.")
         return ""
     return state
-
-
-if __name__ == "__main__":
-    msg = """
-    <think>
-Okay, 
-1
-    """
-    print(model_binary_scoring_cot_preprocessor(msg))
-    
-    msg2="1"
-    
-    print(model_binary_scoring_preprocessor(msg2))
-    print(model_binary_scoring_preprocessor(msg))

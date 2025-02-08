@@ -3,6 +3,7 @@ from io_managers.xlsx_manager import store_to_excel, read_from_excel
 from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
 from text_preprocessors import as_is
 from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
+from request_manager.request_manager import FALLBACK_ERR_MSG
 import copy
 import os
 import time
@@ -191,6 +192,11 @@ class ResponseSet:
             correct_answer = f"{resp_obj[answer_key]}".strip()
             # Add None check, because query_key is for providing context to model_scoring. You can still do STRICT judging without query text.
             context = ""  if context_key == None else f"{resp_obj[context_key]}".strip()
+            
+            # Detect failed request fallback message and skip the question
+            if response == FALLBACK_ERR_MSG:
+                full_score -= 1
+                continue
             
             # For each question, do preprocessings first.
             try:

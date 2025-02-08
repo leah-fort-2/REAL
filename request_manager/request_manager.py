@@ -8,6 +8,7 @@ import logging
 load_dotenv()
 
 MAX_CONCURRENT_REQUESTS = int(os.getenv('BATCH_SIZE', "10"))
+FALLBACK_ERR_MSG = "Unknown error in processing request"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,8 +38,6 @@ async def single_request(request: str, request_params: dict):
     """
     async with aiohttp.ClientSession() as session:
         return await _process_request(request, request_params, session)
-
-FALLBACK_ERR_MSG = "Unknown error in processing request"
 
 async def _process_request(request, request_params, session, semaphore=None):
     """

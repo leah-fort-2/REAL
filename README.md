@@ -39,7 +39,7 @@ REAL starts at `run.py`. To start the first evaluation with REAL, follow the ste
     - score output path (Optional: default to `model_results.xlsx`; for storing the metrics to a file)
     - test mode (Optional: default to `False`; evaluate only first 10 queries of the first subset, used for debug purposes).
 
-Optionally, you can start from `run_custom.py` (for evaluating single custom file) or `run_requests_only.py` (for batch requests without score judging).
+Optionally, you can start from `run_custom.py` (for evaluating single custom file) or `run_requests_only.py` (for batch requests without score judging). Go check the entrance files, they are pretty self-explanatory.
 
 Below is an example of how to use an adapter.
 

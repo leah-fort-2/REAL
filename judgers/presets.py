@@ -7,25 +7,33 @@ Does not care about preprocessing. That is delegated to preprocessor module.
 """
 
 from judgers.model_binary_judge import model_scoring
+import asyncio
 
 # A failed flag used in score judging module in dataset_model
 JUDGE_FAILED_MSG = "Judge failed."
 
-def STRICT_MATCH(response:str, answer:str, context="") -> float :
+async def STRICT_MATCH(response:str, answer:str, context="") -> float :
     """
     Strictly compare response and answer. No context.
     
     Recommended scenarios: mcq, closed-ended question
     """
+    # Use asyncio.to_thread to submit as async task
+    # Why? Because model_scoring is async! Need to maintain a unified interface.
+    return await asyncio.to_thread(_STRICT_MATCH, response, answer, context=context)
+
+def _STRICT_MATCH(response: str, answer: str, context="") -> float:
     return float(response == answer)
     
-def EDIT_DISTANCE_RATIO(response: str, answer: str, context="") -> float:
+async def TEXT_SIMILARITY(response: str, answer: str, context="") -> float:
     """
     Calculate a similarity ratio @[0,1]. 0 = totally different, 1 = identical
     
     No context.
     """
-    
+    return await asyncio.to_thread(_TEXT_SIMILARITY, response, answer, context=context)
+
+def _TEXT_SIMILARITY(response: str, answer: str, context="") -> float:
     ROWS, COLUMNS = len(response), len(answer)
     
     operation_matrix = [[0] * (COLUMNS + 1) for _ in range(ROWS + 1)]
@@ -123,13 +131,13 @@ def EDIT_DISTANCE_RATIO(response: str, answer: str, context="") -> float:
     
     return 1 - operation_matrix[ROWS][COLUMNS] / max(ROWS, COLUMNS)
 
-def MODEL_SCORING(response: str, answer: str, context="") -> float | str:
+async def MODEL_SCORING(response: str, answer: str, context="") -> float | str:
     """
     Score response with a judge model.
     
     Recommended scenarios: open-ended question, response model with bad IF
     """
-    score = model_scoring(response, answer, context)
+    score = await model_scoring(response, answer, context)
     
     if score == "":
         return JUDGE_FAILED_MSG

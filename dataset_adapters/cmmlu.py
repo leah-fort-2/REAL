@@ -16,9 +16,10 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
     as in `cmmlu/agronomy.csv`
     - Evaluation format supported: depend on ResponseSet.store_to method
     
+    :params worker: The industrious worker.
     :params results_dir: Store evaluation results in this directory. e.g. results/cmmlu/athene-v2-chat/test-athene-v2-chat-agronomy.xlsx
     :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
-    :params test_mode: only the first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params test_mode: only first 10 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
     """
     DATASET_NAME = "cmmlu"
     MODEL = worker.get_params()["model"]
@@ -35,7 +36,7 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
         # this get_path method can return None when query_set is instantiated with a literal query string list. However, this wouldn't happen in dataset evaluation. No need for None safety validation.
         
         # Use query set path basename as eval name as each subset should have its distinctive name.
-        score_result = response_set.judge(answer_key="Answer", 
+        score_result = await response_set.judge(answer_key="Answer", 
                                           eval_name=f"{parse_filename_from_path(subset_path)}",
                                           response_preprocessor = mcq_preprocessor)
         
@@ -50,7 +51,7 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
     
     # Test mode: Only the first subset will be evaluated.
     if test_mode:
-        datasets = [datasets[0]]
+        datasets = [datasets[0][:10]]
         
     for i, subset_path in enumerate(datasets):
         # The original cmmlu test set contains 5 mcq fields. Need to merge them into one.

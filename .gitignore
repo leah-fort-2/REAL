@@ -3,9 +3,16 @@ __pycache__
 *.csv
 *.xls
 *.xlsx
+!example_query_file.xlsx
 *.jsonl
 test_*
 datasets/*
 !datasets/PUT_DATASETS_HERE
 results/*
 !results/STORE_RESULTS_HERE
+!results/batch_query/
+results/batch_query/*
+!results/batch_query/BATCH_QUERY_RESULTS_HERE
+!results/custom_tests/
+results/custom_tests/*
+!results/custom_tests/CUSTOM_TEST_RESULTS_HERE

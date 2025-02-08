@@ -7,7 +7,7 @@ import logging
 
 load_dotenv()
 
-MAX_CONCURRENT_REQUESTS = int(os.getenv('BATCH_SIZE', "10"))
+MAX_CONCURRENT_REQUESTS = int(os.getenv('BATCH_SIZE', "5"))
 FALLBACK_ERR_MSG = "Unknown error in processing request"
 
 # Configure logging
@@ -22,7 +22,7 @@ async def process_batch(request_list: list[str], request_params: dict):
     :param request_params: Request parameters in body e.g. temperature
     :return: a list of response strings, or error messages
     """
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    semaphore = None if MAX_CONCURRENT_REQUESTS == 0 else asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     async with aiohttp.ClientSession() as session:
         tasks = [_process_request(request, request_params, session, semaphore=semaphore) for request in request_list]
         responses = await asyncio.gather(*tasks)

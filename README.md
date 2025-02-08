@@ -37,7 +37,9 @@ REAL starts at `run.py`. To start the first evaluation with REAL, follow the ste
     - **the worker**
     - results dir (Optional: default to `results`; for where to store responses)
     - score output path (Optional: default to `model_results.xlsx`; for storing the metrics to a file)
-    - test mode (Optional: default to `False`; evaluate only the first subset, used for debug purposes).
+    - test mode (Optional: default to `False`; evaluate only first 10 queries of the first subset, used for debug purposes).
+
+Optionally, you can start from `run_custom.py` (for evaluating single custom file) or `run_requests_only.py` (for batch requests without score judging).
 
 Below is an example of how to use an adapter.
 
@@ -78,7 +80,7 @@ Read through to learn how to customize an adapter. An adapter is dedicated to th
 **Post**
 
 - Call `ResponseSet` method `store_to` with an output path. (supported format: csv, xlsx, jsonl) Storing full response records is highly advised for archiving purposes.
-- Call `ResponseSet` method `judge` with 1) an answer field and 2) an eval name (for marking each subset record) to do score judging. The `judge` method will return a literal dictionary containing scoring info.
+- Call `ResponseSet` async method `judge` with 1) an answer field and 2) an eval name (for marking each subset record) to do score judging. The `judge` method will return a literal dictionary containing scoring info.
   - You may specify a response_processor (default: as_is) / answer_processor (default: as_is) / judger (default: `STRICT_MATCH`) as you need. 
   - Some preprocessors are ready at `dataset_adapters.response_preprocessors`.
 - Spawn a `ResponseSet` instance with the judge result dictionary to `store_to` a score output file.
@@ -107,7 +109,7 @@ flowchart LR
 
 ```
 
-## Timeout, max attempts and Batch size
+## Timeout, max attempts and batch size
 
 Since REAL is essentially an augmented batch request tool, it has these connection settings. Configure them at .env file.
 
@@ -129,6 +131,7 @@ NOTE: The semaphore is JOB-SPECIFIC: each job launches a process_batch which has
 
 ```bash
 BATCH_SIZE=5
+SCORING_BATCH_SIZE=5
 ```
 
 ```python

@@ -4,13 +4,18 @@ from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
 from text_preprocessors import as_is
 from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
 from request_manager.request_manager import FALLBACK_ERR_MSG
+import asyncio
 import copy
 import os
 import time
 import logging
+import dotenv
+
+dotenv.load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+SCORING_BATCH_SIZE = int(os.getenv("SCORING_BATCH_SIZE", "5"))
 
 class QuerySet:
     def __init__(self, file_path_or_query_list: str | list[dict] | list[str], field_names=[]):
@@ -47,6 +52,18 @@ class QuerySet:
     def __len__(self):
         return len(self.queries)
     
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            # Handle single query item access
+            return self.queries[key]
+        elif isinstance(key, slice):
+            # Handle slicing
+            subset = QuerySet(self.queries[key])
+            subset.file_path = self.file_path
+            return subset
+        else:
+            raise TypeError(f"Invalid key type: {type(key)}. Only int and slice are supported.")
+    
     def get_path(self):
         """
         :return: path to the query set file. If instantiated from a list, return None.
@@ -67,20 +84,14 @@ class QuerySet:
         """
         return [query[query_key] for query in self.get_queries()]
     
-    def divide(self, division_size=10):
+    def divide(self, division_size=10) -> list:
         """
         Split an entire query set into divisions with remainders e.g. `[10, 10, 10, 5]`. Subsets inherit all fields and file path from the parent set. 
         
         :params division_size: Maximum size of each subset
-        :return: (less than or equal to) division-sized query subset.
+        :return: a list of (less than or equal to) division-sized query subset.
         """
-        
-        def spawn_subset(queries_chunk, path):
-            subset = QuerySet(queries_chunk)
-            subset.file_path = path
-            return subset
-        
-        return [spawn_subset(self.get_queries()[i:i + division_size], self.get_path()) for i in range(0, len(self.queries), division_size)]
+        return [self[i:i + division_size] for i in range(0, len(self), division_size)]
     
     def merge_keys(self, key_list_to_merge, merged_key_name, with_key_names=True):
         """
@@ -115,6 +126,7 @@ class ResponseSet:
     def __init__(self, response_list: list[dict], query_key=None, response_key=None):
         """
         You should not instantiate this class directly unless you know what you are doing.
+        
         :params query_key: Optional. Only for score judging.
         :params response_key: Optional. Only for score judging. 
         """
@@ -125,6 +137,7 @@ class ResponseSet:
     def get_responses(self):
         """
         Returns the very list[dict] containing response objects.
+        
         :return: the response list.
 
         """
@@ -133,14 +146,25 @@ class ResponseSet:
     def __len__(self):
         return len(self.responses)
     
-    def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT_MATCH):
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            # Handle single query item access
+            return self.responses[key]
+        elif isinstance(key, slice):
+            # Handle slicing
+            subset = ResponseSet(self.responses[key], query_key=self.query_key, response_key=self.response_key)
+            return subset
+        else:
+            raise TypeError(f"Invalid key type: {type(key)}. Only int and slice are supported.")
+    
+    async def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT_MATCH, foreign_response_key=None):
         """
-        Conduct a [0,1] acc score judging using specified answer field with optional context, preprocessing and judger method. Failed judgings are ignored. Return a scoring dictionary.
+        Submit a [0,1] acc score judging task using specified answer field with optional context, preprocessing and judger method. Failed judgings are ignored. Return a scoring dictionary.
         
         - :side effects: Modifies self.responses by adding a new field "score"
         
         :params answer_key: Specify the field name for answer. Default to "answer"
-        :params context_key: Optional. Specify the field name for context. Default to None. If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
+        :params str context_key: Optional. Specify the field name for context. Default to None. If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
         :params eval_name: Name bound to eval records ONLY in this judging. e.g. "accountant_val" "agronomy". Default to "Evaluation"
         :params (str -> str) response_preprocessor:
 
@@ -150,7 +174,10 @@ class ResponseSet:
           - Same as response, but for answer.
         :params ((response:str, answer:str, context=str) -> str) judger:
         
-          - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score. Default to STRICT.
+          - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score. Default to STRICT_MATCH.
+          
+        :params str foreign_response_key: Default to None. Retrieve specified key value instead of the response_key set on instantiation. Default to None.
+
 
         :return dict<str, Any>: A score dictionary with following fields:
 
@@ -160,7 +187,13 @@ class ResponseSet:
         - :accuracy: final score / full score -> float
         
         """
-        if self.response_key == None:
+        if not isinstance(foreign_response_key, str):
+            logger.error(f"foreign_response_key must be a string. Got {type(foreign_response_key)} instead. ")
+            return None
+
+        response_key = foreign_response_key if foreign_response_key else self.response_key
+        
+        if response_key == None:
             logger.error(f"The evaluation {eval_name} does not have response_key specified. Unable to proceed with score judging.")
             return None
         
@@ -172,8 +205,8 @@ class ResponseSet:
             logger.error(f"Evaluation {eval_name}'s answer_key {answer_key} does not seem to be an existing field.")
             return None
             
-        if self.response_key not in list(self.responses[0].keys()):
-            logger.error(f"Evaluation {eval_name}'s response_key {self.response_key} does not seem to be an existing field.")
+        if response_key not in list(self.responses[0].keys()):
+            logger.error(f"Evaluation {eval_name}'s response_key {response_key} does not seem to be an existing field.")
             return None
             
         # If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
@@ -187,8 +220,10 @@ class ResponseSet:
         score = 0
         full_score = len(self)
         
+        semaphore = None if SCORING_BATCH_SIZE == 0 else asyncio.Semaphore(SCORING_BATCH_SIZE)
+        
         for resp_obj in self.responses:
-            response = f"{resp_obj[self.response_key]}".strip()
+            response = f"{resp_obj[response_key]}".strip()
             correct_answer = f"{resp_obj[answer_key]}".strip()
             # Add None check, because query_key is for providing context to model_scoring. You can still do STRICT judging without query text.
             context = ""  if context_key == None else f"{resp_obj[context_key]}".strip()
@@ -211,22 +246,26 @@ class ResponseSet:
             # Skip questions with empty answer/response.
             if preprocessed_answer == "":
                 # No valid answer field. Skip the question.
-                logger.error(f"Parsed invalid answer field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Parsed invalid answer field. Skippped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 full_score -= 1
                 continue
             
             if preprocessed_response == "":
                 # No valid response field to judge. Skip the question.
-                logger.error(f"Parsed invalid response field. Skippped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Parsed invalid response field. Skippped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 full_score -= 1
                 continue
             
             # Score judging algorithm.
-            response_score: float = judger(preprocessed_answer, preprocessed_response, context = context)
-            
+            if semaphore:
+                async with semaphore:
+                    response_score = await judger(preprocessed_answer, preprocessed_response, context = context)
+            else:
+                response_score = await judger(preprocessed_answer, preprocessed_response, context = context)
+
             if response_score == JUDGE_FAILED_MSG:
                 # Score judging failed. Skip the question. Most likely stemming from model scoring.
-                logger.error(f"Score judging failed. Skipped. Response: {resp_obj[self.response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Score judging failed. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 full_score -=1
                 continue
             

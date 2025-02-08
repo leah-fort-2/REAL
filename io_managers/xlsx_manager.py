@@ -2,6 +2,8 @@ import openpyxl
 
 def store_to_excel(excel_filename: str, data_list: list[dict]):
     """
+    Store a list of dictionaries (data entries) into the first table of an excel file.
+    
     :params str excel_filename: Path to the Excel file
     :params list[dict] data_list: List of dictionaries to be written to the file
     :return: None
@@ -40,6 +42,8 @@ def store_to_excel(excel_filename: str, data_list: list[dict]):
 
 def read_from_excel(excel_filename, fields=[]):
     """
+    Read from the first table of the Excel file.
+    
     :params str excel_filename: Path to the Excel file
     :params list[str] fields: List of fields to read. If empty, all fields are read
 

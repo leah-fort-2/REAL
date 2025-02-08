@@ -28,15 +28,8 @@ class QuerySet:
         """
         if isinstance(file_path_or_query_list, str):
             # A path to the query file is provided
-            if not file_path_or_query_list.endswith('.csv') and not file_path_or_query_list.endswith('.xlsx') and not file_path_or_query_list.endswith('.jsonl'):
-                raise ValueError(f"Reading from unsupported file format: \"{file_path_or_query_list}\". Please use the following: csv, xlsx, jsonl.")
+            self._read_queries_from_file(file_path_or_query_list, field_names)
             self.file_path = file_path_or_query_list
-            if file_path_or_query_list.endswith('.csv'):
-                self.queries = read_from_csv(file_path_or_query_list, field_names)
-            elif file_path_or_query_list.endswith('.xlsx'):
-                self.queries = read_from_excel(file_path_or_query_list, field_names)
-            elif file_path_or_query_list.endswith('.jsonl'):
-                self.queries = read_from_jsonl(file_path_or_query_list, field_names)
         elif len(file_path_or_query_list)==0:
             # The provided query list is empty
             logger.warning(f"Empty set encountered on {file_path_or_query_list}.")
@@ -48,6 +41,20 @@ class QuerySet:
             # A list of query strings is provided
             self.file_path = None
             self.queries = [{"query": query} for query in file_path_or_query_list]
+
+    def _read_queries_from_file(self, file_path_or_query_list, field_names):
+        file_readers = {
+            ".csv": read_from_csv,
+            ".xlsx": read_from_excel,
+            ".jsonl": read_from_jsonl
+        }
+        
+        ext = os.path.splitext(file_path_or_query_list)[1]
+        reader = file_readers.get(ext)
+        if reader:
+            self.queries = reader(file_path_or_query_list, field_names)
+        else:
+            raise ValueError(f"Reading from unsupported file format: \"{file_path_or_query_list}\". Please use the following: csv, xlsx, jsonl.")
     
     def __len__(self):
         return len(self.queries)
@@ -187,35 +194,19 @@ class ResponseSet:
         - :accuracy: final score / full score -> float
         
         """
-        if not isinstance(foreign_response_key, str):
-            logger.error(f"foreign_response_key must be a string. Got {type(foreign_response_key)} instead. ")
-            return None
-
-        response_key = foreign_response_key if foreign_response_key else self.response_key
-        
-        if response_key == None:
-            logger.error(f"The evaluation {eval_name} does not have response_key specified. Unable to proceed with score judging.")
-            return None
-        
         if len(self.responses) == 0:
             logger.warning(f"The evaluation {eval_name} has an empty response set.")
             return None
         
-        if answer_key not in list(self.responses[0].keys()):
-            logger.error(f"Evaluation {eval_name}'s answer_key {answer_key} does not seem to be an existing field.")
+        if not self._validate_key_names(eval_name, answer_key, context_key, foreign_response_key):
             return None
-            
-        if response_key not in list(self.responses[0].keys()):
-            logger.error(f"Evaluation {eval_name}'s response_key {response_key} does not seem to be an existing field.")
-            return None
-            
+        
+        # If foreign_response_key is specified, judge that instead
+        response_key = foreign_response_key if foreign_response_key else self.response_key
+        
         # If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
-        if context_key != None:
-            if context_key not in list(self.responses[0].keys()):
-                logger.error(f"Evaluation {eval_name}'s optional context_key {context_key} does not seem to be an existing field.")
-                return None
-        elif self.query_key != None:
-                context_key = self.query_key
+        if context_key == None and self.query_key != None:
+            context_key = self.query_key
         
         score = 0
         full_score = len(self)
@@ -223,15 +214,56 @@ class ResponseSet:
         semaphore = None if SCORING_BATCH_SIZE == 0 else asyncio.Semaphore(SCORING_BATCH_SIZE)
         
         for resp_obj in self.responses:
-            response = f"{resp_obj[response_key]}".strip()
-            correct_answer = f"{resp_obj[answer_key]}".strip()
-            # Add None check, because query_key is for providing context to model_scoring. You can still do STRICT judging without query text.
-            context = ""  if context_key == None else f"{resp_obj[context_key]}".strip()
+            # Receives a score delta tuple.
+            score_change, full_score_change = await self._judge_single_resp_obj(eval_name, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore)
+            score += score_change
+            full_score += full_score_change
+                
+        logger.info(
+            f"\n======\nEvaluation Report:\nEvaluation Name: {eval_name}\nAccuracy: {score}/{full_score} ({round(100*score/full_score, 1)}%)\n======\n")
+
+        return {"eval_name": eval_name, "score": score, "full_score": full_score, "accuracy": score/full_score}
+
+    def _validate_key_names(self, eval_name, answer_key, context_key, foreign_response_key):
+        
+        if foreign_response_key and not isinstance(foreign_response_key, str):
+            logger.error(f"foreign_response_key must be a string. Got {type(foreign_response_key)} instead. ")
+            return False
+
+        response_key = foreign_response_key if foreign_response_key else self.response_key
+        
+        if response_key == None:
+            logger.error(f"The evaluation {eval_name} does not have response_key specified. Unable to proceed with score judging.")
+            return False
             
+        if response_key not in list(self.responses[0].keys()):
+            logger.error(f"Evaluation {eval_name}'s response_key {response_key} does not seem to be an existing field.")
+            return False
+                
+        if answer_key not in list(self.responses[0].keys()):
+            logger.error(f"Evaluation {eval_name}'s answer_key {answer_key} does not seem to be an existing field.")
+            return False
+        
+        # If context_key is specified, need to check whether it exists in the response set.
+        # If not, validation fails
+        if context_key != None:
+            if context_key not in list(self.responses[0].keys()):
+                logger.error(f"Evaluation {eval_name}'s optional context_key {context_key} does not seem to be an existing field.")
+                return False
+        
+        return True
+    
+    async def _judge_single_resp_obj(self, eval_name, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore=None):
+        # context_key has been validated to be either 1) None (fall back to query_key) or 2) an existing key in response. Safe to retrieve.
+        response = resp_obj[response_key]
+        correct_answer = resp_obj[answer_key]
+        context = resp_obj[context_key]
+                
+        # Detect cases where questions should be skipped
+        def _is_skipped_pre_judging():
             # Detect failed request fallback message and skip the question
             if response == FALLBACK_ERR_MSG:
-                full_score -= 1
-                continue
+                return True
             
             # For each question, do preprocessings first.
             try:
@@ -240,42 +272,46 @@ class ResponseSet:
             except Exception:
                 # Preprocessing failed, skip the question.
                 logger.error(f"An error occurred in preprocessing stage: {str(Exception)[:50]}... Skip the question.")
-                full_score -= 1
-                continue
-            
+                return True
+
             # Skip questions with empty answer/response.
             if preprocessed_answer == "":
                 # No valid answer field. Skip the question.
                 logger.error(f"Parsed invalid answer field. Skippped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
-                full_score -= 1
-                continue
+                return True
             
             if preprocessed_response == "":
                 # No valid response field to judge. Skip the question.
                 logger.error(f"Parsed invalid response field. Skippped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
-                full_score -= 1
-                continue
-            
-            # Score judging algorithm.
-            if semaphore:
-                async with semaphore:
-                    response_score = await judger(preprocessed_answer, preprocessed_response, context = context)
-            else:
-                response_score = await judger(preprocessed_answer, preprocessed_response, context = context)
+                return True
+        
+        # Tuple[score, full_score] for score changes. (0, -1) for skipped; (score, 0) for not skipped
+        SKIPPED = (0, -1)
+        def JUDGED(result_score):
+            return (result_score,  0)
+        
+        if  _is_skipped_pre_judging():
+            # Tuple[score, full_score] for score changes
+            return SKIPPED
 
-            if response_score == JUDGE_FAILED_MSG:
-                # Score judging failed. Skip the question. Most likely stemming from model scoring.
-                logger.error(f"Score judging failed. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
-                full_score -=1
-                continue
-            
-            score += response_score
-            resp_obj.update({f"{eval_name}_score": response_score})
-                
-        logger.info(
-            f"\n======\nEvaluation Report:\nEvaluation Name: {eval_name}\nAccuracy: {score}/{full_score} ({round(100*score/full_score, 1)}%)\n======\n")
+        # Preprocessors have been validated.
+        preprocessed_response = response_preprocessor(response)
+        preprocessed_answer = answer_preprocessor(correct_answer)
+        # Score judging algorithm.
+        if semaphore:
+            async with semaphore:
+                score = await judger(preprocessed_answer, preprocessed_response, context = context)
+        else:
+            score = await judger(preprocessed_answer, preprocessed_response, context = context)
 
-        return {"eval_name": eval_name, "score": score, "full_score": full_score, "accuracy": score/full_score}
+        if score == JUDGE_FAILED_MSG:
+            # Score judging failed. Most likely stemming from model scoring.
+            logger.error(f"Score judging failed. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+            # Skip the question in scoring
+            return SKIPPED
+        
+        resp_obj.update({f"{eval_name}_score": score})
+        return JUDGED(score)
 
     
     def store_to(self, file_path):
@@ -284,27 +320,29 @@ class ResponseSet:
         
         :params file_path: The path to store the results. Support CSV, XLSX and JSONL format.
 
-        """
-        if not file_path.endswith('.csv') and not file_path.endswith('.xlsx'):
-            raise ValueError(f"Storing to unsupported file format: \"{file_path}\". Please use CSV or XLSX.")
+        """        
+        file_writers = {
+            ".csv": store_to_csv,
+            ".xlsx": store_to_excel,
+            ".jsonl": store_to_jsonl
+        }
+        ext = os.path.splitext(file_path)[1]
+        writer = file_writers.get(ext)
+        if writer == None:
+            raise ValueError(f"Storing to unsupported file format: \"{file_path}\". Please use csv, xlsx or jsonl.")
         
         dirname = os.path.dirname(file_path)
         if dirname != "" and not os.path.isdir(dirname):
             os.makedirs(dirname)
             
         # Handle concurrent file writing between jobs. Default: 2 retries, 5 sec interval
-        
         max_retries = 2 # set max retry count
         interval = 5 # in seconds
         retry = 0
+        
         for _ in range(max_retries + 1): # range has exclusive upper bound
             try:
-                if file_path.endswith('.csv'):
-                    store_to_csv(file_path, self.responses)
-                elif file_path.endswith('.xlsx'):
-                    store_to_excel(file_path, self.responses)
-                elif file_path.endswith('.jsonl'):
-                    store_to_jsonl(file_path, self.responses)
+                writer(file_path, self.responses)
                 break
             except IOError:
                 if retry < max_retries:

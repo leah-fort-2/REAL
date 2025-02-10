@@ -1,12 +1,13 @@
-__pycache__
 .env
-*.csv
-*.xls
-*.xlsx
+/*.csv
+/*.xls
+/*.xlsx
 !example_query_file.xlsx
-*.jsonl
-test_*
-test/
+./*.jsonl
+__pycache__
+run_*
+!run_custom.py
+!run_requests_only.py
 datasets/*
 !datasets/PUT_DATASETS_HERE
 results/*
@@ -17,3 +18,5 @@ results/batch_query/*
 !results/custom_tests/
 results/custom_tests/*
 !results/custom_tests/CUSTOM_TEST_RESULTS_HERE
+test_*
+test/

@@ -212,6 +212,12 @@ class ResponseSet:
             return subset
         else:
             raise TypeError(f"Invalid key type: {type(key)}. Only int and slice are supported.")
+        
+    def get_response_key(self):
+        return self.response_key
+    
+    def get_query_key(self):
+        return self.query_key
     
     async def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT_MATCH, foreign_response_key=None):
         """
@@ -233,7 +239,6 @@ class ResponseSet:
           - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score. Default to STRICT_MATCH.
           
         :params str foreign_response_key: Default to None. Retrieve specified key value instead of the response_key set on instantiation. Default to None.
-
 
         :return dict<str, Any>: A score dictionary with following fields:
 

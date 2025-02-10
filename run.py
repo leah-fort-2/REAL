@@ -6,20 +6,24 @@ from dataset_adapters.ceval import conduct_ceval, make_system_prompt as make_cev
 from dataset_adapters.cmmlu import conduct_cmmlu, make_system_prompt as make_cmmlu_system_prompt
 from dataset_adapters.mmlu import conduct_mmlu, make_system_prompt as make_mmlu_system_prompt
 from dataset_adapters.gpqa import conduct_gpqa, make_system_prompt as make_gpqa_system_prompt, make_suffix as make_gpqa_suffix
-from dataset_models import QuerySet
 
 load_dotenv()
 
-# Load custom BASE_URL and API_KEY from .env file
+"""
+In this file, a workflow is demonstrated with 4 models evaluated in one go. 
 
-BASE_URL = "http://192.168.1.9:6006/v1"
+You may run them sequentially, or if resources allow it, concurrently.
+
+prompt specifics are configured in the respective adapter file, as they do be quite "specific". However, these are just my recommendation. Use whatever you like here.
+"""
+
+# Load custom BASE_URL and API_KEY from .env file, or specify them at runtime
+
+BASE_URL = os.getenv("BASE_URL")
 API_KEY = os.getenv("API_KEY")
-MODEL = "calmerys-78b-orpo-v0.1-exl2-3.0bpw"
+MODEL = os.getenv("MODEL")
 
 async def main():
-    """
-    A demonstration on how to run typical dataset evaluations.
-    """
     
     # Locate datasets (not packed within)
     CEVAL_DIR = "datasets/ceval/formal_ceval/val"

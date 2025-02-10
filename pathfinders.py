@@ -26,7 +26,7 @@ def list_files_in_directory(directory, match_pattern=""):
                 file_paths.append(os.path.join(root, file))
     return file_paths
 
-def craft_result_path(query_set: QuerySet, results_dir, dataset_name, model):
+def craft_result_path(query_set: QuerySet, results_dir, dataset_name, model, file_ext="xlsx"):
     """
     Crafts a filename (**xlsx format**) for evaluation results of query_set. e.g. `results_dir/dataset_name/model/test-model-query_set_name.xlsx`
     
@@ -34,6 +34,7 @@ def craft_result_path(query_set: QuerySet, results_dir, dataset_name, model):
     :params str results_dir: The desetination directory for evaluation results.
     :params str dataset_name: Mark the results as part of a dataset.
     :params str model: The evaluated model name for identifying result files.
+    :params file_ext: Optional. Use destination formats other than xlsx.
     :return: The target filename.
     """
     file_path = query_set.get_path()
@@ -42,7 +43,7 @@ def craft_result_path(query_set: QuerySet, results_dir, dataset_name, model):
     if file_path != None:
         query_name = parse_filename_from_path(query_set.get_path())
     
-    return f'{strip_trailing_slashes_from_path(results_dir)}/{dataset_name}/{model}/{sanitize_pathname(f"test-{model}-{query_name}")}.xlsx'
+    return f'{strip_trailing_slashes_from_path(results_dir)}/{dataset_name}/{model}/{sanitize_pathname(f"test-{model}-{query_name}")}.{file_ext}'
 
 def craft_eval_dir_path(results_dir, dataset_name, model):
     """

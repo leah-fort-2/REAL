@@ -7,16 +7,13 @@ import os
 load_dotenv()
 
 """
-    Run requests only, without score judging
+    Run requests only without score judging.
     
     - query_file_path
     - workers: Evaluation multiple models together against the file. Read README for more worker details.
     - output_dir: The directory to store the result file. e.g. "results/batch_query/example_query_file_responses.xlsx"
-    - test_mode: Only run first 10 queries from the file. For debuf purposes. Default to False.
-    
-    Moreover, you need to specify the following test-specific fields in batch_query.py
-    
     - query_key: The key for evaluation queries. Default to "query".
+    - test_mode: Only run first 10 queries from the file. For debuf purposes. Default to False.
 """
 
 # Worker parameters

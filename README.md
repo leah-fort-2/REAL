@@ -1,9 +1,12 @@
 # REAL
 
-- [About](#about)
-- [Example Usage](#example-usage)
-- [Workflow Orchestration in Adapters](#workflow-orchestration-in-adapters)
-- [Timeout and Batch size](#timeout-and-batch-size)
+- [REAL](#real)
+  - [About](#about)
+  - [Installation](#installation)
+  - [Example Usage](#example-usage)
+  - [Workflow Orchestration in Adapters](#workflow-orchestration-in-adapters)
+  - [Timeout, max attempts and batch size](#timeout-max-attempts-and-batch-size)
+  - [Extensibility](#extensibility)
 
 ## About
 
@@ -18,26 +21,55 @@ Features:
 - **Evaluation presets**: mmlu/ceval/cmmlu (datasets are not included)
 - **Score judging**: Conduct flexible score judging via response/answer preprocessor chain. CoT? Reflection? Preprocess it.
 
+## Installation
+
+1. Install dependencies. Run `pip install -r requirements.txt` in your preferred environment. I recommend miniconda
+
+  - Create a conda virtual environment:
+
+```bash
+conda create -n REAL python=3.12
+conda init
+conda activate REAL
+```
+2. Install nltk resource file. Some of the external eval methods require it.
+
+```python
+import nltk
+nltk.download("punkt_tab")
+# True
+```
+3. Download dataset
+
+open-compass provides a nice compilation of popular datasets:
+
+```
+# Download dataset to datasets/ folder
+wget https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-core-20240207.zip
+unzip OpenCompassData-core-20240207.zip
+```
+
+And it's done. Happy evaluation!
+
 ## Example Usage
 
-REAL starts at `run.py`. To start the first evaluation with REAL, follow the steps:
+REAL starts at `run.py`. It gives you plenty of flexibility in workflow, but meanwhile requires you to do some orchestration:
 
-0. **Create an .env file**: Look at .env.example which has all the required env variables. Duplicate it, create a `.env`, and fill in your own values.
+1. **Create an .env file**: Look at .env.example which has all the required env variables. Duplicate it, create a `.env`, and fill in your own values.
 
-1. **Locate a dataset**: Take your own datasets. Put it in `datasets` directory (nested directories are supported).
-> Currently, REAL supports ceval, cmmlu and mmlu. But theoretically you can use REAL for any xlsx/csv/jsonl dataset.
+2. **Locate a dataset**: Take your own datasets. Put it in `datasets` directory (nested directories are supported).
+> Currently, REAL provides a limited bunch of preset adapters. But theoretically you can use REAL for any xlsx/csv/jsonl dataset.
 
-> You might need to implement your own adapter for dataset structures other than the typical mcq structure `[question, a,  b, c, d, answer]`. Keep reading for how an adapter is used in REAL architecture.
+> You might need to implement your own adapter for dataset structures other than the typical mcq scheme `[question, a,  b, c, d, answer]`. Keep reading for how an adapter is constructed in REAL.
 
-2. **Create a worker @`run.py`** :A worker takes a `RequestParams` instance which is its profile. It will `invoke` requests following this profile.
+1. **Create a worker @`run.py`** :A worker takes a `RequestParams` instance which is its profile. It will `invoke` requests following this profile.
 > If you wish to not use certain parameters, either 1) leave them as blank in .env file, or 2) explicitly use `None` at runtime. e.g. Avoid top_p when using temperature.
 
-3. **Call an adapter @`run.py`**: An adapter wraps the evaluation logic and takes
+1. **Call an adapter @`run.py`**: An adapter wraps the evaluation logic and takes
     - **the dataset directory**
     - **the worker**
-    - results dir (Optional: default to `results`; for where to store responses)
-    - score output path (Optional: default to `model_results.xlsx`; for storing the metrics to a file)
-    - test mode (Optional: default to `False`; evaluate only first 10 queries of the first subset, used for debug purposes).
+    - optional parameters required by specific datasets
+    - test mode: only evaluating the first 10 questions
 
 Optionally, you can start from `run_custom.py` (for evaluating single custom file) or `run_requests_only.py` (for batch requests without score judging). Go check the entrance files, they are pretty self-explanatory.
 
@@ -140,3 +172,9 @@ job1 = worker(dataset_1, "question").invoke()
 job2 = worker(dataset_2, "Question").invoke()
 # Also has a semaphore of 5
 ```
+
+## Extensibility
+
+There isn't only mcq scheme, but actually many more types of dataset. From 2.6.0, the `external_eval_methods` module is incorporated, with dataset-specific evaluation modules composed mostly by dataset creators themselves. Thanks must go to all of them, who have layed the foundation together for the prosperity of open-source AI communities. Their code is adapted to REAL's architecture, so that evaluations can be operated in a unified way. The original docs are retained for reference. 
+
+Many of these external modules use file I/O to retrieve/export evaluation processings. REAL is designed to receive these data processings via `dataset_models`, and manage them in `dataset_adapters`, which gives it great potential in extensibility. More effort will be dedicated consistently in facilitating this project's maintenance.

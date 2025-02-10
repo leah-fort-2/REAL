@@ -13,7 +13,8 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
     
     :params list[Worker] workers: The workers to dispatch.
     :params output_dir: Store result file in this directory. Default to: results/batch_query
-    :params test_mode: only the first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params query_key: Specify which key to query. Default to: "query"
+    :params test_mode: Only the first subset under dataset_dir will be evaluated. Only for debug purposes.
     """
     
     # Check if both query_file_path and output_dir exist

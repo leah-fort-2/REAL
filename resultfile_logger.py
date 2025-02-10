@@ -31,13 +31,14 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def log_resultfile(dataset_name, worker: Worker, log_dir: str):
+def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
     """
     Write a `RESULTFILE` to the specified directory. Append.
     
     :params str dataset_name: The dataset name to be logged.
     :params Worker worker: A worker instance. Its parameters will be logged as evaluation parameters.
     :params str log_dir: Where to store the log file.
+    :params params: Specify test_set_type: str and judging_method: str in RESULTFILE
 
     """
     # Default values
@@ -60,8 +61,8 @@ def log_resultfile(dataset_name, worker: Worker, log_dir: str):
     
     # Update default values with provided parameter values
     values = worker.get_params()
-    final_values = {**default_values, **values}
-    
+    final_values = {**default_values, **values, **params}
+        
     # Create the RESULTFILE content
     resultfile_content = f"""date: {final_values['date']}
 model: {final_values['model']}

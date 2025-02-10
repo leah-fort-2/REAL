@@ -4,12 +4,13 @@ from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
 from text_preprocessors import as_is
 from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
 from request_manager.request_manager import FALLBACK_ERR_MSG
+from random import shuffle
+import logging
+import dotenv
 import asyncio
 import copy
 import os
 import time
-import logging
-import dotenv
 
 dotenv.load_dotenv()
 
@@ -128,6 +129,54 @@ class QuerySet:
         updated_query_set = QuerySet(updated_query)
         updated_query_set.file_path = self.file_path
         return updated_query_set
+    
+    def mcq_shuffle(self, answer_key, target_answer_key, keys_to_shuffle=["A", "B", "C", "D"], target_option_keys=["A", "B", "C", "D"]):
+        """
+        Return a new QuerySet with specified keys shuffled. All existing keys not updated are retained. Only applies on mcq with key name as answer e.g. {"answer": "C"} but not {"answer": "answer value"}
+        
+        :params answer_key: The answer key before shuffling
+        :params target_answer_key: Where to store the new answer after shuffling
+        :params keys_to_shuffle: The mcq option keys to shuffle. Default to ABCD but order does not matter. Must match target_option_keys in number. e.g. 4 == 4
+        :params target_option_keys: WHere to store the shuffled options. Default to ABCD. The order is preserved in the new query_set. Must match target_option_keys in number. e.g. 4 == 4
+        :return: A `QuerySet` object with shuffled keys.
+        """
+        
+        existing_queries = self.get_queries()
+        shuffled_queries = []
+        if len(keys_to_shuffle) != len(target_option_keys):
+            raise ValueError(f"The key lists before and after shuffling do not match in number. I can't shuffle {len(keys_to_shuffle)} options into {len(target_option_keys)}.")
+            
+        for query_obj in existing_queries:
+            answer=""
+            try:
+                answer=query_obj[answer_key]
+            except KeyError:
+                raise KeyError(f"Specified answer key not found. Query: {str(query_obj)[:50]}...; Available keys: {", ".join(query_obj.keys())}")
+            
+            shuffle(keys_to_shuffle)
+            new_query_obj = {}
+            new_answer = ""
+            # [A, B, C, D], [B, C, D, A] => {A: ..., B: ..., ...} 
+            for target_option_key, original_option_key in zip(target_option_keys, keys_to_shuffle):
+                # {A: some option}
+                new_query_obj[target_option_key]=query_obj[original_option_key]
+                # original option key is the answer 
+                if original_option_key == answer:
+                    # {answer: some option}
+                    new_answer = target_option_key
+            
+            # To keep the order of target keys, update the answer key at last.
+            new_query_obj[target_answer_key]=new_answer
+            # The new query key has been populated
+            shuffled_queries.append(new_query_obj)
+            
+        # As per now, we have a new list of query objects.
+        # We will finish by updating the shuffled queries to existing queries, to keep other existing fields.
+        [existing_query.update(shuffled_query) for existing_query, shuffled_query in zip(existing_queries, shuffled_queries)]
+        
+        shuffled_set = QuerySet(existing_queries)
+        shuffled_set.file_path = self.get_path()
+        return shuffled_set
     
 class ResponseSet:
     def __init__(self, response_list: list[dict], query_key=None, response_key=None):

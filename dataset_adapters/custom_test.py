@@ -13,8 +13,8 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
     :params list[Worker] workers: The workers to dispatch.
     :params str output_dir: Store result file in this directory. Default to: results/custom_tests
     :params bool test_mode: only the first subset under dataset_dir will be tested. Only for debug purposes.
-    :params judging_preprocessor: Preprocess the response before score judging. Default to as_is.
     :params judging_algorithm: The judging algorithm used for score judging. Preset: STRICT_MATCH (for A == A), TEXT_SIMILARITY (based on minimal editing steps), and MODEL_SCORING (submitted to a judger model).
+    :params judging_preprocessor: Preprocess the response before score judging. Default to as_is.
     :params query_key: The key for evaluation queries. Set as your query file requires.
     :params answer_key: Conduct score judging based on this key. Required for score judging.
     """

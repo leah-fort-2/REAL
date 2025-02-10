@@ -32,6 +32,8 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
     
     if test_mode:
         query_set = query_set[:10]
+        output_dir = os.path.join("test/", output_dir)
+        
             
     QUERY_SET_NAME = parse_filename_from_path(test_file_path)
     # For aggregated output

@@ -59,6 +59,8 @@ async def conduct_mmlu(dataset_dir: str, worker: Worker, results_dir="results", 
     # Test mode: Only the first subset will be evaluated.
     if test_mode:
         datasets = [datasets[0]]
+        results_dir = os.path.join("test/", results_dir)
+        score_output_path = os.path.join("test/", score_output_path)
     
     for i, subset_path in enumerate(datasets):
         # The original ceval test set contains 5 mcp fields. Need to merge them into one.

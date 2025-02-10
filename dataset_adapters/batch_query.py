@@ -27,6 +27,7 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
         
     if test_mode:
         query_set = query_set[:10]
+        output_dir = os.path.join("test/", output_dir)
             
     QUERY_SET_NAME = parse_filename_from_path(query_file_path)
     # For aggregated output

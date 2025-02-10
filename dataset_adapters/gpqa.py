@@ -67,6 +67,8 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, results_dir="results", 
     # Test mode: Only the first subset will be evaluated.
     if test_mode:
         datasets = [datasets[0]]
+        results_dir = os.path.join("test/", results_dir)
+        score_output_path = os.path.join("test/", score_output_path)
         
     for i, subset_path in enumerate(datasets):
         selected_keys = [original_query_key, original_answer_key, *original_option_keys]

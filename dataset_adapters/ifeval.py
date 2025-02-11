@@ -38,7 +38,7 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
     query_set = QuerySet(ifeval_src_file_path)
     
     if test_mode:
-        query_set = query_set[:5]
+        query_set = query_set[:10]
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
         

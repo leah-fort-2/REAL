@@ -25,7 +25,7 @@ async def process_batch(request_list: list[str], request_params: dict):
     semaphore = None if MAX_CONCURRENT_REQUESTS == 0 else asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     batch_total = len(request_list)
     async with aiohttp.ClientSession() as session:
-        tasks = [_process_request(request, request_params, session, semaphore=semaphore, request_id=f"{i}/{batch_total}") for i, request in enumerate(request_list)]
+        tasks = [_process_request(request, request_params, session, semaphore=semaphore, request_id=f"{i + 1}/{batch_total}") for i, request in enumerate(request_list)]
         responses = await asyncio.gather(*tasks)
     return responses
 

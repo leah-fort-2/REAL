@@ -72,6 +72,12 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
     - :Valid cot but Empty conclusion: ""
     """
     
+    def remove_multiple_choices(s: str):
+        """
+        Answer: A/B/C/D (X)
+        """
+        return re.sub("[ABCDabcd]\W{0,2}[ABCDabcd](\W{0,2}[ABCDabcd]){0,2}(\W|$)", "", s)
+    
     def _catch_bad_cot_then_pick_last_letter(s: str):
         """
         These conditional makes the component methods not individually chainable to pipeline:
@@ -91,6 +97,7 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
         # e.g. "Answer: B\nThe above is the answer." => "B"
 
     return preprocess_pipeline(response, 
+                               remove_multiple_choices,
                                remove_think_tags,
                                _catch_bad_cot_then_pick_last_letter)
     

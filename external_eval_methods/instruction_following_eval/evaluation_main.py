@@ -28,6 +28,8 @@ import logging as global_logging
 from dataset_models import ResponseSet
 from external_eval_methods.instruction_following_eval import instructions_registry
 
+from request_manager.request_manager import FALLBACK_ERR_MSG
+
 global_logging.basicConfig(level=global_logging.INFO)
 logger = global_logging.getLogger(__name__)
 SCORING_BATCH_SIZE = int(os.getenv("SCORING_BATCH_SIZE", "5"))
@@ -308,12 +310,14 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
   # key, instruction_id_list, prompt, kwargs
   eval_entries = read_prompt_list(ifeval_eval_file_path)
   
+  query_key = response_set.get_query_key()
+  response_key = response_set.get_query_key()
   responses = response_set.get_responses()
   # A prompt: response dict
   prompt_to_response = {}
   [prompt_to_response.update(
-    {resp_obj[response_set.get_query_key()] # The prompt
-        : resp_obj[response_set.get_response_key()]}) # The response
+    {resp_obj[query_key] # The prompt
+        : resp_obj[response_key]}) # The response
         for resp_obj in responses]
 
   # test if accuracy
@@ -325,13 +329,14 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
     outputs : list[OutputExample] = [] 
     # Get score OutputExample obj for each eval_obj in eval_entries.
     for eval_obj, resp_obj in zip(eval_entries, responses):
-      output_example: OutputExample = test_if(eval_obj, prompt_to_response)
-      outputs.append(output_example)
-      # Score calculation
-      score: bool = output_example.follow_all_instructions
-      resp_obj.update({
-        f"{EVAL_NAME}_{test_mode_name}_score": 1 if score else 0}
-      )
+      if resp_obj["responses"]!=FALLBACK_ERR_MSG:
+        output_example: OutputExample = test_if(eval_obj, prompt_to_response)
+        outputs.append(output_example)
+        # Score calculation
+        score: bool = output_example.follow_all_instructions
+        resp_obj.update({
+          f"{EVAL_NAME}_{test_mode_name}_score": 1 if score else 0}
+        )
     # Finished updating all resp objs in ResponseSet.
     
     # Total score and acc calculation

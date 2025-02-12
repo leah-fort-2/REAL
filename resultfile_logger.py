@@ -50,7 +50,9 @@ def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
         'quantization_bits': 'null',
         'temperature': 'null',
         'top_p': 'null',
+        'max_tokens': 'null',
         'frequency_penalty': 'null',
+        'presence_penalty': 'null',
         'system_prompt': '',
         'prompt_prefix': '',
         'prompt_suffix': '',
@@ -73,12 +75,14 @@ quantization_bits: {final_values['quantization_bits']}
 # model settings
 temperature: {final_values['temperature']}
 top_p: {final_values['top_p']}
+max_tokens: {final_values['max_tokens']}
 frequency_penalty: {final_values['frequency_penalty']}
+presence_penalty: {final_values['presence_penalty']}
 
 # prompt settings
-system_prompt: "{final_values['system_prompt']}"
-prompt_prefix: "{final_values['prompt_prefix']}"
-prompt_suffix: "{final_values['prompt_suffix']}"
+system_prompt: "{escape(final_values['system_prompt'])}"
+prompt_prefix: "{escape(final_values['prompt_prefix'])}"
+prompt_suffix: "{escape(final_values['prompt_suffix'])}"
 
 # score judging specifics
 test_set_name: {final_values['test_set_name']}
@@ -99,3 +103,7 @@ judging_method: {final_values['judging_method']}"""
         log_msg()
     else:
         log_failed_msg()
+        
+def escape(str):
+    state = str.replace(':', '\\:').replace("\n", "\\n")
+    return state

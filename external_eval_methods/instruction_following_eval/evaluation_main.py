@@ -339,7 +339,7 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
     full_score = len(outputs)
     accuracy = result_score/full_score
     logger.info(
-            f"\n======\nEvaluation Report:\nEvaluation Name: {EVAL_NAME}\nAccuracy: {accuracy} ({round(100*result_score/full_score, 1)}%)\n======\n")
+            f"\n======\nEvaluation Report:\nEvaluation Name: {EVAL_NAME}\nAccuracy: {result_score}/{full_score} ({round(100*result_score/full_score, 1)}%)\n======\n")
 
     # Return a score briefing object
     return {"eval_name": EVAL_NAME, "score": result_score, "full_score": full_score, "accuracy": accuracy}

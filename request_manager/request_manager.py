@@ -23,8 +23,9 @@ async def process_batch(request_list: list[str], request_params: dict):
     :return: a list of response strings, or error messages
     """
     semaphore = None if MAX_CONCURRENT_REQUESTS == 0 else asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    batch_total = len(request_list)
     async with aiohttp.ClientSession() as session:
-        tasks = [_process_request(request, request_params, session, semaphore=semaphore) for request in request_list]
+        tasks = [_process_request(request, request_params, session, semaphore=semaphore, request_id=f"{i}/{batch_total}") for i, request in enumerate(request_list)]
         responses = await asyncio.gather(*tasks)
     return responses
 
@@ -39,7 +40,7 @@ async def single_request(request: str, request_params: dict):
     async with aiohttp.ClientSession() as session:
         return await _process_request(request, request_params, session)
 
-async def _process_request(request, request_params, session, semaphore=None):
+async def _process_request(request, request_params, session, semaphore=None, request_id=None):
     """
     Process a single request as part of a batch operation, where a session and a semaphore are managed externally. Returns a message content string.
     
@@ -60,7 +61,7 @@ async def _process_request(request, request_params, session, semaphore=None):
                 # Deepseek reasoner now supports outputting its reflection process. You can use extract_content to get the response content only.
                 # content = extract_content_with_reasoning(response)
                 content = extract_content(response)
-                logger.info(f"Processed request: {request[:50]}...")
+                logger.info(f"Processed request{f" {request_id}" if request_id else ""}: {request[:50]}...")
                 return content
             else:
                 logger.error(f"Failed to process request: {request[:50]}... Response: {response}")

@@ -28,6 +28,7 @@ import logging as global_logging
 from dataset_models import ResponseSet
 from external_eval_methods.instruction_following_eval import instructions_registry
 
+from io_managers.jsonl_manager import read_from_jsonl
 from request_manager.request_manager import FALLBACK_ERR_MSG
 
 global_logging.basicConfig(level=global_logging.INFO)
@@ -70,14 +71,15 @@ class OutputExample:
 def read_prompt_list(input_jsonl_filename):
   """Read inputs from jsonl."""
   inputs = []
-  with open(input_jsonl_filename, "r") as f:
-    for l in f:
-      example = json.loads(l)
-      inputs.append(
-          InputExample(key=example["key"],
-                       instruction_id_list=example["instruction_id_list"],
-                       prompt=example["prompt"],
-                       kwargs=example["kwargs"]))
+  literal_list = read_from_jsonl(input_jsonl_filename)
+
+  for example in literal_list:
+    inputs.append(
+        InputExample(key=example["key"],
+                      instruction_id_list=example["instruction_id_list"],
+                      prompt=example["prompt"],
+                      kwargs=example["kwargs"]))
+
   return inputs
 
 def read_prompt_list_from_obj(input_obj_list):
@@ -329,7 +331,7 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
     outputs : list[OutputExample] = [] 
     # Get score OutputExample obj for each eval_obj in eval_entries.
     for eval_obj, resp_obj in zip(eval_entries, responses):
-      if resp_obj["responses"]!=FALLBACK_ERR_MSG:
+      if resp_obj[response_key]!=FALLBACK_ERR_MSG:
         output_example: OutputExample = test_if(eval_obj, prompt_to_response)
         outputs.append(output_example)
         # Score calculation

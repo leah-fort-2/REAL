@@ -20,7 +20,7 @@ def store_to_csv(filename: str, data_list: list[dict]):
         for row in data_list:
             writer.writerow(row)
 
-def read_from_csv(filename, fields=[]):
+def read_from_csv(filename: str, fields=[]):
     """
     :params filename: path to the csv file
     :params list[str] fields: list of fields to read. If empty, all fields are read

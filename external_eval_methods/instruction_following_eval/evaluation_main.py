@@ -28,7 +28,7 @@ import logging as global_logging
 from dataset_models import ResponseSet
 from external_eval_methods.instruction_following_eval import instructions_registry
 
-from io_managers.jsonl_manager import read_from_jsonl
+from io_managers import get_reader
 from request_manager.request_manager import FALLBACK_ERR_MSG
 
 global_logging.basicConfig(level=global_logging.INFO)
@@ -68,10 +68,12 @@ class OutputExample:
   follow_instruction_list: list[bool]
 
 
-def read_prompt_list(input_jsonl_filename):
-  """Read inputs from jsonl."""
+def read_prompt_list(input_jsonl_filename: str):
+  """Read inputs from an ifeval jsonl test file."""
   inputs = []
-  literal_list = read_from_jsonl(input_jsonl_filename)
+  reader, _ = get_reader(input_jsonl_filename)
+  
+  literal_list = reader(input_jsonl_filename)
 
   for example in literal_list:
     inputs.append(

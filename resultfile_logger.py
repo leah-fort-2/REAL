@@ -25,7 +25,7 @@ Initialize a RESULTFILE with (default field values):
 import os
 from datetime import datetime
 from worker import Worker
-from io_managers.raw_file_writer import write_to_file
+from io_managers import get_writer
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -99,7 +99,8 @@ judging_method: {final_values['judging_method']}"""
         
     # Write the RESULTFILE content to the specified file
     if os.path.isdir(log_dir):
-        write_to_file(resultfile_path, resultfile_content)
+        writer, ext = get_writer(resultfile_path)
+        writer(resultfile_path, resultfile_content)
         log_msg()
     else:
         log_failed_msg()

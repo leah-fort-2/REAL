@@ -40,7 +40,7 @@ def store_to_excel(excel_filename: str, data_list: list[dict]):
     
     workbook.save(excel_filename)
 
-def read_from_excel(excel_filename, fields=[]):
+def read_from_excel(excel_filename:str , fields=[]):
     """
     Read from the first table of the Excel file.
     

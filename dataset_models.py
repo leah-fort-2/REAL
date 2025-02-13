@@ -1,10 +1,9 @@
-from io_managers.csv_manager import store_to_csv, read_from_csv
-from io_managers.xlsx_manager import store_to_excel, read_from_excel
-from io_managers.jsonl_manager import store_to_jsonl, read_from_jsonl
+from io_managers import get_reader, get_writer
 from text_preprocessors import as_is
 from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
 from request_manager.request_manager import FALLBACK_ERR_MSG
 from random import shuffle
+from typing import Callable
 import logging
 import dotenv
 import asyncio
@@ -29,7 +28,7 @@ class QuerySet:
         """
         if isinstance(file_path_or_query_list, str):
             # A path to the query file is provided
-            self._read_queries_from_file(file_path_or_query_list, field_names)
+            self.queries = self._read_queries_from_file(file_path_or_query_list, field_names)
             self.file_path = file_path_or_query_list
         elif len(file_path_or_query_list)==0:
             # The provided query list is empty
@@ -43,19 +42,16 @@ class QuerySet:
             self.file_path = None
             self.queries = [{"query": query} for query in file_path_or_query_list]
 
-    def _read_queries_from_file(self, file_path_or_query_list, field_names):
-        file_readers = {
-            ".csv": read_from_csv,
-            ".xlsx": read_from_excel,
-            ".jsonl": read_from_jsonl
-        }
+    def _read_queries_from_file(self, file_path_or_query_list: str, field_names: list[str]):
+        reader: Callable[[str, list], list] = None
+        try:
+            reader, ext = get_reader(file_path_or_query_list)
+        except ValueError:
+            raise ValueError(f"Reading from unsupported file format: \"{file_path_or_query_list}\".")
         
-        ext = os.path.splitext(file_path_or_query_list)[1]
-        reader = file_readers.get(ext)
-        if reader:
-            self.queries = reader(file_path_or_query_list, field_names)
-        else:
-            raise ValueError(f"Reading from unsupported file format: \"{file_path_or_query_list}\". Please use the following: csv, xlsx, jsonl.")
+        # None safety has been ensured
+        return reader(file_path_or_query_list, field_names)
+        
     
     def __len__(self):
         return len(self.queries)
@@ -374,15 +370,9 @@ class ResponseSet:
         
         :params file_path: The path to store the results. Support CSV, XLSX and JSONL format.
 
-        """        
-        file_writers = {
-            ".csv": store_to_csv,
-            ".xlsx": store_to_excel,
-            ".jsonl": store_to_jsonl
-        }
-        ext = os.path.splitext(file_path)[1]
-        writer = file_writers.get(ext)
-        if writer == None:
+        """
+        writer, ext = get_writer(file_path)
+        if ext == None:
             raise ValueError(f"Storing to unsupported file format: \"{file_path}\". Please use csv, xlsx or jsonl.")
         
         dirname = os.path.dirname(file_path)

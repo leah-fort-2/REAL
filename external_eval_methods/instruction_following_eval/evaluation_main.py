@@ -316,10 +316,14 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
   
   query_key = response_set.get_query_key()
   response_key = response_set.get_query_key()
+  query_key = response_set.get_query_key()
+  response_key = response_set.get_query_key()
   responses = response_set.get_responses()
   # A prompt: response dict
   prompt_to_response = {}
   [prompt_to_response.update(
+    {resp_obj[query_key] # The prompt
+        : resp_obj[response_key]}) # The response
     {resp_obj[query_key] # The prompt
         : resp_obj[response_key]}) # The response
         for resp_obj in responses]

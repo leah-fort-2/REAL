@@ -11,8 +11,19 @@ def store_to_excel(excel_filename: str, data_list: list[dict]):
     if not data_list:
         return
     
-    # Get the field names from the first data item
-    data_fields = list(data_list[0].keys())
+    # init field names from the first data item, to retain order without using a sorting method, 
+    data_fields = list(data_list[0])
+    
+    # Find additional fields
+    aggregated_fields = set()
+
+    for entry in data_list[1:]:
+        aggregated_fields = aggregated_fields.union(entry)
+                
+    for el in aggregated_fields:
+        if el not in data_fields:
+            data_fields.append(el)
+
     try:
         # Try to open an existing Excel file
         workbook = openpyxl.load_workbook(excel_filename)

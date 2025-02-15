@@ -24,16 +24,19 @@ def mcq_preprocessor(response: str):
     """
     Simple mcq preprocessor that uses the first letter if independent, then uppercase it.
     
-    An independent letter has no adjacent alphanumeric characters. A well-formated MCQ response starts with and only contains a letter "A-D". Containing formatting, at least the first alphabetical character as independent (`**A**` is possible).
+    An independent letter has no adjacent alphanumeric characters. A well-formated MCQ response starts with and only contains a letter. Considering formatting, at least the first/last alphabetical character should be independent (`**A**` is possible).
     
     e.g. ` A. answer` => `A`
     `Unknown error in connection` => ""
     """
     
+    def _handle_both_ends(s: str):
+        first_independent_letter = pick_first_letter_if_independent(s)
+        return first_independent_letter if first_independent_letter else pick_last_letter_if_independent(s)
+    
     return preprocess_pipeline(response, 
-                               pick_first_letter_if_independent,
-                               lambda s: s.upper(),
-                               filter_bad_option_letters)
+                               _handle_both_ends,
+                               lambda s: s.upper())
 
 def mcq_cot_preprocessor(response: str):
     """
@@ -43,15 +46,18 @@ def mcq_cot_preprocessor(response: str):
     - :Valid cot but Empty conclusion: ""
     - :Otherwise: as in mcq_preprocessor
     """
+    def _handle_both_ends(s: str):
+        first_independent_letter = pick_first_letter_if_independent(s)
+        return first_independent_letter if first_independent_letter else pick_last_letter_if_independent(s)
+    
     def _catch_bad_cot_pipeline(s: str):
         # On bad cot, immediately return fallback message. Otherwise same as in mcq_preprocessor
         if s == THINK_FAILED_MSG:
             # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
             return THINK_FAILED_MSG
         return preprocess_pipeline(s, 
-                                   pick_first_letter_if_independent,
-                                   lambda s: s.upper(),
-                                   filter_bad_option_letters)
+                                   _handle_both_ends,
+                                   lambda s: s.upper())
     
     return preprocess_pipeline(response, 
                                remove_think_tags, 
@@ -65,7 +71,7 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
     
     - :Regular: The last alphabetical character uppercased `The correct answer is: A.` => `A`
     
-    - :Last letter is not among A/B/C/D: Try search `/Answer: [A-Da-d]/`: `Answer: D\\nThe correct answer` => `D`
+    - :Multiple answers (among ABCD) were given: `A, B, C` => [removed]
     
     - :No match: ""
     
@@ -76,13 +82,15 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
         """
         Answer: A/B/C/D (X)
         """
-        return re.sub("[ABCDabcd]\W{0,2}[ABCDabcd](\W{0,2}[ABCDabcd]){0,2}(\W|$)", "", s)
+        return re.sub("[ABCDabcd]\\W{0,2}[ABCDabcd](\\W{0,2}[ABCDabcd]){0,2}(\\W|$)", "", s)
     
-    def _catch_bad_cot_then_pick_last_letter(s: str):
+    def _catch_bad_cot_pipeline(s: str):
         """
         These conditional makes the component methods not individually chainable to pipeline:
         
         - :THINK_FAILED_MSG input: immediately return the flag
+        
+        - :letter selection with fallbacks:
         
         - search_for_answer decision upon filter_bad_option_letters
 
@@ -91,15 +99,19 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
             # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
             return THINK_FAILED_MSG
         
-        state = pick_last_letter_if_independent(s).upper()
+        state = pick_last_letter_if_independent(s)
         # e.g.  "Answer: B" -> "B" 
-        return state if filter_bad_option_letters(state) else search_for_answer(s)
+        
+        state = state if state else pick_first_numbers_if_independent(s)
+        # Try to catch if the first letter is the answer
+        
+        return state.upper() if state else search_for_answer(s)
         # e.g. "Answer: B\nThe above is the answer." => "B"
 
     return preprocess_pipeline(response, 
                                remove_multiple_choices,
                                remove_think_tags,
-                               _catch_bad_cot_then_pick_last_letter)
+                               _catch_bad_cot_pipeline)
     
 def model_binary_scoring_cot_preprocessor(response: str) -> str:
     """
@@ -275,17 +287,24 @@ def search_for_answer(s: str):
     # Remove latex boxed statement e.g. `\boxed{A}`
     unboxed = s.replace("\\boxed", " ")
     
-    # Match multiple non-word characters before the first "A-D" character after "Answer:".
+    # Allow multiple non-word characters before the first alphabetical (A-Za-z) group after "Answer:".
     # Model might use "**A**" or adding arbitrary spaces around the letter.
-    pattern = f"[Aa]nswer:([^\\w]*?)([A-Da-d])"
+    # This is not matched: `Answer: not sure`
+    pattern = f"[Aa]nswer:([^\\w]*?)([A-Za-z]+)"
     match = re.search(pattern, unboxed)
     if match != None:
-        return match.group(2).upper()
+        # Only pick if the first letter of the group is independent. e.g. `Answer: A` but not `Answer: Shark` 
+        state = pick_first_letter_if_independent(match.group(2))
+        if state:
+            return state.upper()
         
-    pattern_zh = f"答案[：:]([^\\w]*?)([A-Da-d])"
+    pattern_zh = f"答案[：:]([^\\w]*?)([A-Za-z]+)"
     match_zh = re.search(pattern_zh, unboxed)
     if match_zh != None:
-        return match_zh.group(2).upper()
+        # Same as above.
+        state2 = pick_first_letter_if_independent(match_zh.group(2))
+        if state2:
+            return state2.upper()
 
     logger.error(f"Failed to parse answer from response: {s[:50]}")
     return ""

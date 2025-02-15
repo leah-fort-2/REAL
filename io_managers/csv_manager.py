@@ -10,8 +10,19 @@ def store_to_csv(filename: str, data_list: list[dict]):
     if not data_list:
         return
     
-    fieldnames = data_list[0].keys()
+    # init field names from the first data item, to retain order without using a sorting method, 
+    fieldnames = list(data_list[0])
     
+    # Find additional fields
+    aggregated_fields = set()
+
+    for entry in data_list[1:]:
+        aggregated_fields = aggregated_fields.union(entry)
+                
+    for el in aggregated_fields:
+        if el not in fieldnames:
+            fieldnames.append(el)
+            
     header_flag = not os.path.exists(filename) or os.path.getsize(filename) == 0
     with open(filename, 'a', newline='', encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)

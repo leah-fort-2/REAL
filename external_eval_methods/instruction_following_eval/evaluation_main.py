@@ -315,9 +315,7 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
   eval_entries = read_prompt_list(ifeval_eval_file_path)
   
   query_key = response_set.get_query_key()
-  response_key = response_set.get_query_key()
-  query_key = response_set.get_query_key()
-  response_key = response_set.get_query_key()
+  response_key = response_set.get_response_key()
   responses = response_set.get_responses()
   # A prompt: response dict
   prompt_to_response = {}

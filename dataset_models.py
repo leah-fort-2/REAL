@@ -18,6 +18,17 @@ logger = logging.getLogger(__name__)
 SCORING_BATCH_SIZE = int(os.getenv("SCORING_BATCH_SIZE", "5"))
 
 class QuerySet:
+
+    def _filter_fields(self, query_list: list[dict], field_names: list[str]) -> list[dict]:
+        """
+        Filter the fields in each dictionary in the query list to include only the specified fields. On empty field_names, return [].
+        
+        :params list[dict] query_list: The list of dictionaries to filter.
+        :params list[str] field_names: The list of field names to retain.
+        :return: A new list of dictionaries containing only the specified fields.
+        """
+        return [{field: query[field] for field in field_names if field in query} for query in query_list]
+
     def __init__(self, file_path_or_query_list: str | list[dict] | list[str], field_names=[]):
         """
         Create a query set. After instantiation, the query set is read only.
@@ -35,8 +46,11 @@ class QuerySet:
             logger.warning(f"Empty set encountered on {file_path_or_query_list}.")
         elif isinstance(file_path_or_query_list[0], dict):
             # A query dictionary is provided as is
+            if field_names:
+                self.queries = self._filter_fields(file_path_or_query_list, field_names)
+            else:
+                self.queries = file_path_or_query_list
             self.file_path = None
-            self.queries = file_path_or_query_list
         else:
             # A list of query strings is provided
             self.file_path = None
@@ -327,12 +341,12 @@ class ResponseSet:
             # Skip questions with empty answer/response.
             if preprocessed_answer == "":
                 # No valid answer field. Skip the question.
-                logger.error(f"Parsed invalid answer field. Skippped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Parsed invalid answer field. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 return True
             
             if preprocessed_response == "":
                 # No valid response field to judge. Skip the question.
-                logger.error(f"Parsed invalid response field. Skippped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Parsed invalid response field. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 return True
         
         # Tuple[score, full_score] for score changes. (0, -1) for skipped; (score, 0) for not skipped

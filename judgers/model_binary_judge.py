@@ -56,8 +56,8 @@ async def model_scoring(response:str, answer: str, context: str):
     score = model_binary_scoring_preprocessor(scoring_result)
     
     # We are using binary scoring, so int instead of float.
-    return score if score == "" else int(score)
-    
+    # On "", return ""
+    return int(score) if score else score
     
 def validate_scoring_model_setting():
     env_scoring_model = os.getenv("SCORING_MODEL")

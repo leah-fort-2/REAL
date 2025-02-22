@@ -41,9 +41,11 @@ class QuerySet:
             # A path to the query file is provided
             self.queries = self._read_queries_from_file(file_path_or_query_list, field_names)
             self.file_path = file_path_or_query_list
-        elif len(file_path_or_query_list)==0:
+        elif len(file_path_or_query_list) == 0:
             # The provided query list is empty
             logger.warning(f"Empty set encountered on {file_path_or_query_list}.")
+            self.queries = []
+            self.file_path = None
         elif isinstance(file_path_or_query_list[0], dict):
             # A query dictionary is provided as is
             if field_names:
@@ -229,9 +231,9 @@ class ResponseSet:
     def get_query_key(self):
         return self.query_key
     
-    async def judge(self, answer_key="answer", context_key = None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT_MATCH, foreign_response_key=None):
+    async def judge(self, answer_key="answer", context_key=None, eval_name="Evaluation", response_preprocessor=as_is, answer_preprocessor=as_is, judger=STRICT_MATCH, foreign_response_key=None):
         """
-        Submit a [0,1] acc score judging task using specified answer field with optional context, preprocessing and judger method. Failed judgings are ignored. Return a scoring dictionary.
+        Submit a [0,1] acc score judging task using specified answer field with optional context, preprocessing and judger method. Failed judgings are ignored. Return a scoring dictionary. On invalid judge parameters, returns None.
         
         - :side effects: Modifies self.responses by adding a new field "score"
         
@@ -269,7 +271,7 @@ class ResponseSet:
         response_key = foreign_response_key if foreign_response_key else self.response_key
         
         # If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
-        if context_key == None and self.query_key != None:
+        if context_key is None and self.query_key is not None:
             context_key = self.query_key
         
         score = 0
@@ -296,7 +298,7 @@ class ResponseSet:
 
         response_key = foreign_response_key if foreign_response_key else self.response_key
         
-        if response_key == None:
+        if response_key is None:
             logger.error(f"The evaluation {eval_name} does not have response_key specified. Unable to proceed with score judging.")
             return False
             
@@ -310,7 +312,7 @@ class ResponseSet:
         
         # If context_key is specified, need to check whether it exists in the response set.
         # If not, validation fails
-        if context_key != None:
+        if context_key is not None:
             if context_key not in list(self.responses[0].keys()):
                 logger.error(f"Evaluation {eval_name}'s optional context_key {context_key} does not seem to be an existing field.")
                 return False
@@ -318,10 +320,10 @@ class ResponseSet:
         return True
     
     async def _judge_single_resp_obj(self, eval_name, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore=None):
-        # context_key has been validated to be either 1) None (fall back to query_key) or 2) an existing key in response. Safe to retrieve.
         response = resp_obj[response_key]
         correct_answer = resp_obj[answer_key]
-        context = resp_obj[context_key]
+        # context_key has been validated to be either 1) an existing key in response 2) fallback to query_key or 3) None. Ensure None safety before retrieval
+        context = resp_obj[context_key] if context_key else ""
                 
         # Detect cases where questions should be skipped
         def _is_skipped_pre_judging():
@@ -364,9 +366,9 @@ class ResponseSet:
         # Score judging algorithm.
         if semaphore:
             async with semaphore:
-                score = await judger(preprocessed_answer, preprocessed_response, context = context)
+                score = await judger(preprocessed_answer, preprocessed_response, context=context)
         else:
-            score = await judger(preprocessed_answer, preprocessed_response, context = context)
+            score = await judger(preprocessed_answer, preprocessed_response, context=context)
 
         if score == JUDGE_FAILED_MSG:
             # Score judging failed. Most likely stemming from model scoring.

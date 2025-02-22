@@ -92,7 +92,7 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
         
         - :letter selection with fallbacks:
         
-        - search_for_answer decision upon filter_bad_option_letters
+        - search_for_answer decision upon no independent letter is found from both ends 
 
         """
         if s == THINK_FAILED_MSG:
@@ -102,7 +102,7 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
         state = pick_last_letter_if_independent(s)
         # e.g.  "Answer: B" -> "B" 
         
-        state = state if state else pick_first_numbers_if_independent(s)
+        state = state if state else pick_first_letter_if_independent(s)
         # Try to catch if the first letter is the answer
         
         return state.upper() if state else search_for_answer(s)

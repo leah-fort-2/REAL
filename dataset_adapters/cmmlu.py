@@ -2,7 +2,7 @@ import os
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
 from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
-from text_preprocessors import mcq_preprocessor
+from text_preprocessors import mcq_preprocessor, mcq_cot_preprocessor_for_bad_if
 from judgers.presets import STRICT_MATCH
 from resultfile_logger import log_resultfile
 import asyncio
@@ -78,7 +78,7 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
         # Task pool has been deprecated. Execute tasks synchronously. Each task is still done asynchronously with batch_size in .env file.
         await task(dataset)
         
-        # Very long haul! Add 120 sec break
+        # Very long haul! Add 60 sec break
         # However, no need to break after the last task.
         if i < len(datasets) - 1:
             await asyncio.sleep(60)
@@ -94,4 +94,4 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
     log()
     
 def make_system_prompt():
-    return f"你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出最合适的选项。直接给出选项前对应的字母，不要给出任何其他内容。"
+    return f"你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出正确选项对应的字母，不要给出任何其他内容。"

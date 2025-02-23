@@ -339,7 +339,7 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
         # Score calculation
         score: bool = output_example.follow_all_instructions
         resp_obj.update({
-          f"{EVAL_NAME}_{test_mode_name}_score": 1 if score else 0}
+          f"score": 1 if score else 0}
         )
     # Finished updating all resp objs in ResponseSet.
     

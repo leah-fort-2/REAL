@@ -174,7 +174,7 @@ def humaneval_eval_raw_pass(
         total.append(len(passed))
         correct.append(sum(passed))
         score: float = sum(passed)/len(passed)
-        response_obj.update({f"{EVAL_NAME}_pass@1_score": score, "reason": f"{'\n'.join(reasons)}"})
+        response_obj.update({f"score": score, "reason": f"{'\n'.join(reasons)}"})
         
     total = np.array(total)
     correct = np.array(correct)

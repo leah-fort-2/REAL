@@ -1,6 +1,5 @@
 from worker import Worker
 from dataset_models import QuerySet, ResponseSet
-from pathfinders import parse_filename_from_path, sanitize_pathname
 import os
 import logging
 from external_eval_methods.instruction_following_eval.evaluation_main import ifeval_judge_strict
@@ -15,14 +14,11 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
     """
     Conduct IFEval through its test file.
 
-    :params test_file_path: A file containing query strings. One query per line. Currently xlsx/csv/jsonl. Depend on ResponseSet.store_to method.
-    :params list[Worker] workers: The workers to dispatch.
-    :params str output_dir: Store result file in this directory. Default to: results/custom_tests
-    :params bool test_mode: only the first subset under dataset_dir will be tested. Only for debug purposes.
-    :params judging_algorithm: The judging algorithm used for score judging. Preset: STRICT_MATCH (for A == A), TEXT_SIMILARITY (based on minimal editing steps), and MODEL_SCORING (submitted to a judger model).
-    :params judging_preprocessor: Preprocess the response before score judging. Default to as_is.
-    :params query_key: The key for evaluation queries. Set as your query file requires.
-    :params answer_key: Conduct score judging based on this key. Required for score judging.
+    :params ifeval_src_file_path: Ifeval test file path.
+    :params worker: The industrious worker.
+    :params str results_dir: Store result file in this directory. Default to: results
+    :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
+    :params bool test_mode: only the first 10 questions will be evaluated. Only for debug purposes.
     """
     # ifeval specific settings, do not modify
     QUERY_KEY = "prompt"

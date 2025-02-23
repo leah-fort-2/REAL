@@ -3,7 +3,7 @@ from dataset_models import QuerySet, ResponseSet
 from worker import Worker
 from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
 from judgers.presets import STRICT_MATCH
-from text_preprocessors import mcq_preprocessor
+from text_preprocessors import mcq_preprocessor, mcq_cot_preprocessor_for_bad_if
 from resultfile_logger import log_resultfile
 import asyncio
 
@@ -78,7 +78,7 @@ async def conduct_ceval_val(dataset_dir: str, worker: Worker, results_dir="resul
         # Task pool has been deprecated. Execute tasks synchronously. Each task is still done asynchronously with batch_size in .env file.
         await task(dataset)
         
-        # Very long haul! Add 120 sec break
+        # Very long haul! Add 60 sec break
         # However, no need to break after the last task.
         if i < len(datasets) - 1:
             await asyncio.sleep(60)

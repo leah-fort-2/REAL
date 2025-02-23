@@ -239,7 +239,7 @@ class ResponseSet:
         
         :params answer_key: Specify the field name for answer. Default to "answer"
         :params str context_key: Optional. Specify the field name for context. Default to None. If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
-        :params eval_name: Name bound to eval records ONLY in this judging. e.g. "accountant_val" "agronomy". Default to "Evaluation"
+        :params eval_name: Only for generating report on the terminal. e.g. "accountant_val" "agronomy". Default to "Evaluation"
         :params (str -> str) response_preprocessor:
 
           - Preprocess the response before submitting to the judger method. e.g. `mcq_preprocessor`, etc. Default to `as_is`. See text_preprocessors module. 
@@ -281,7 +281,7 @@ class ResponseSet:
         
         for resp_obj in self.responses:
             # Receives a score delta tuple.
-            score_change, full_score_change = await self._judge_single_resp_obj(eval_name, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore)
+            score_change, full_score_change = await self._judge_single_resp_obj(resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore)
             score += score_change
             full_score += full_score_change
                 
@@ -319,7 +319,7 @@ class ResponseSet:
         
         return True
     
-    async def _judge_single_resp_obj(self, eval_name, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore=None):
+    async def _judge_single_resp_obj(self, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore=None):
         response = resp_obj[response_key]
         correct_answer = resp_obj[answer_key]
         # context_key has been validated to be either 1) an existing key in response 2) fallback to query_key or 3) None. Ensure None safety before retrieval
@@ -376,7 +376,7 @@ class ResponseSet:
             # Skip the question in scoring
             return SKIPPED
         
-        resp_obj.update({f"{eval_name}_score": score})
+        resp_obj.update({f"score": score})
         return JUDGED(score)
 
     

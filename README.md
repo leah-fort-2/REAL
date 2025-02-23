@@ -18,38 +18,48 @@ Features:
 - **Workers**: Benchmark tasks are assigned to workers. A worker takes its profile (model name, base url and api key, and model parameters) and conduct batched requests/score judging.
 - **Dataset adapters**: The evaluation logic is encapsulated in adapters, dedicated to meet the requirements of differnt data structures of datasets.
 - **Create adapters**: Customize the evaluation workflow by creating adapters that cater to specific needs.
-- **Evaluation presets**: mmlu/ceval/cmmlu (datasets are not included)
+- **Evaluation presets**: A bunch already: mmlu/cmmlu/mmlu_pro/ifeval/humaneval/gpqa (datasets are not included)
 - **Score judging**: Conduct flexible score judging via response/answer preprocessor chain. CoT? Reflection? Preprocess it.
 
 ## Installation
 
 1. Install dependencies. Run `pip install -r requirements.txt` in your preferred environment. I recommend miniconda
 
-  - Create a conda virtual environment:
-
 ```bash
+# Create a conda virtual environment
 conda create -n REAL python=3.12
 conda init
 conda activate REAL
 ```
-2. Install nltk resource file. Some of the external eval methods require it.
+
+2. Download/Prepare dataset
+
+open-compass provides a nice compilation of popular datasets:
+
+```sh
+# Download dataset to datasets/ folder
+wget https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-core-20240207.zip
+unzip OpenCompassData-core-20240207.zip
+```
+
+3. (Optional) Install nltk resource file. Ifeval requires it.
 
 ```python
 import nltk
 nltk.download("punkt_tab")
 # True
 ```
-3. Download dataset
 
-open-compass provides a nice compilation of popular datasets:
+Humaneval uses `parquet` format by default. In that case, you will have to convert that to `jsonl` first:
 
+```python
+import pandas as pd
+df = pd.read_parquet(...)
+df.to_json('test.jsonl', orient='records', lines=True)
+# test.jsonl
 ```
-# Download dataset to datasets/ folder
-wget https://github.com/open-compass/opencompass/releases/download/0.2.2.rc1/OpenCompassData-core-20240207.zip
-unzip OpenCompassData-core-20240207.zip
-```
 
-And it's done. Happy evaluation!
+Happy evaluation!
 
 ## Example Usage
 
@@ -178,3 +188,17 @@ job2 = worker(dataset_2, "Question").invoke()
 There isn't only mcq scheme, but actually many more types of dataset. From 2.6.0, the `external_eval_methods` module is incorporated, with dataset-specific evaluation modules composed mostly by dataset creators themselves. Thanks must go to all of them, who have layed the foundation together for the prosperity of open-source AI communities. Their code is adapted to REAL's architecture, so that evaluations can be operated in a unified way. The original docs are retained for reference. 
 
 Many of these external modules use file I/O to retrieve/export evaluation processings. REAL is designed to receive these data processings via `dataset_models`, and manage them in `dataset_adapters`, which gives it great potential in extensibility. More effort will be dedicated consistently in facilitating this project's maintenance.
+
+## Appendix
+
+### Evaluation Defaults
+
+| Eval Name | Temperature | System Prompt | Prompt Prefix | Prompt Suffix | Max Tokens | Judge |
+| --- | --- | --- | --- | --- | --- | --- |
+| ceval | 0.0 | 你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出正确选项对应的字母，不要给出任何其他内容。 | | |128|STRICT_MATCH|
+| cmmlu | 0.0 | 你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出正确选项对应的字母，不要给出任何其他内容。 | | |128|STRICT_MATCH|
+| mmlu | 0.0 | You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content. | | |128|STRICT_MATCH|
+| gpqa | 0.0 | You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content. | | |128|STRICT_MATCH|
+| ifeval | 0.0 |  | | |2048|ifeval_judge_strict|
+| mmlu_pro | 0.0 | You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content. | | |128|STRICT_MATCH|
+| humaneval | 0.0 | You are a coder. Complete the following code block according to the docstring with proper indentation. Provide ONLY the completion without additional content.\n | | \# YOUR COMPLETION STARTS HERE\n |512|humaneval_eval_raw_pass|

@@ -1,5 +1,6 @@
 import asyncio
 from typing import Tuple
+from tqdm import tqdm
 from dataset_models import QuerySet, ResponseSet
 from judgers.presets import STRICT_MATCH
 from pathfinders import craft_eval_dir_path, strip_trailing_slashes_from_path
@@ -7,7 +8,6 @@ from resultfile_logger import log_resultfile
 from text_preprocessors import mcq_preprocessor
 from worker import Worker
 from collections import defaultdict
-import json
 import os
 import logging
 
@@ -97,7 +97,7 @@ async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, results_dir=
             )
             for category, response_list in responses_categorized.items()]
 
-    for i, query_set_chunk in enumerate(query_set_chunks):
+    for i, query_set_chunk in tqdm(enumerate(query_set_chunks), total=len(query_set_chunks), desc=f"{DATASET_NAME}: Evaluation Progress"):
         await task(query_set_chunk)
 
         if i < len(query_set_chunks)-1:

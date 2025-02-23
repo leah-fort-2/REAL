@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
 from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
@@ -63,7 +64,7 @@ async def conduct_ceval(dataset_dir: str, worker: Worker, results_dir="results",
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
         
-    for i, subset_path in enumerate(datasets):
+    for i, subset_path in tqdm(enumerate(datasets), total=len(datasets), desc=f"{DATASET_NAME}: Evaluation Progress"):
         # The original ceval test set contains 5 mcq fields. Need to merge them into one.
         # Test mode: Only the first 10 queries will be evaluated.
         raw_dataset = QuerySet(subset_path)[:10] if test_mode else QuerySet(subset_path)
@@ -95,4 +96,4 @@ async def conduct_ceval(dataset_dir: str, worker: Worker, results_dir="results",
     log()
     
 def make_system_prompt():
-    return f"你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出最合适的选项。直接给出选项前对应的字母，不要给出任何其他内容。"
+    return f"你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出正确选项对应的字母，不要给出任何其他内容。"

@@ -1,4 +1,5 @@
 import os
+from tqdm import tqdm
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
 from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
@@ -63,7 +64,7 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, results_dir="results",
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
         
-    for i, subset_path in enumerate(datasets):
+    for i, subset_path in tqdm(enumerate(datasets), total=len(datasets), desc=f"{DATASET_NAME}: Evaluation Progress"):
         # The original cmmlu test set contains 5 mcq fields. Need to merge them into one.
         # Test mode: Only the first 10 queries will be evaluated.
         raw_dataset = QuerySet(subset_path)[:10] if test_mode else QuerySet(subset_path)

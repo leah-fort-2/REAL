@@ -12,16 +12,12 @@ import asyncio
 # A failed flag used in score judging module in dataset_model
 JUDGE_FAILED_MSG = "Judge failed."
 
-async def STRICT_MATCH(response: str, answer: str, context="") -> float | str:
+async def STRICT_MATCH(response: str, answer: str, context="") -> float:
     """
     Strictly compare response and answer. No context.
     
     Recommended scenarios: mcq, closed-ended question
     """
-    # Check for invalid response or answer
-    if not response or not answer:
-        return JUDGE_FAILED_MSG
-
     # Use asyncio.to_thread to submit as async task
     # Why? Because model_scoring is async! Need to maintain a unified interface.
     return await asyncio.to_thread(_STRICT_MATCH, response, answer, context=context)
@@ -35,10 +31,6 @@ async def TEXT_SIMILARITY(response: str, answer: str, context="") -> float:
     
     No context.
     """
-    # Check for invalid response or answer
-    if not response or not answer:
-        return JUDGE_FAILED_MSG
-    
     return await asyncio.to_thread(_TEXT_SIMILARITY, response, answer, context=context)
 
 def _TEXT_SIMILARITY(response: str, answer: str, context="") -> float:
@@ -147,6 +139,6 @@ async def MODEL_SCORING(response: str, answer: str, context="") -> float | str:
     """
     score = await model_scoring(response, answer, context)
     
-    if not score:
+    if score == "":
         return JUDGE_FAILED_MSG
     return float(score)

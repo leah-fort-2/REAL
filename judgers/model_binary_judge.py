@@ -10,7 +10,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def make_judge_prompt():
-    return "You are an high-level exam judge. You will be provided with a response text, a question text and a list of reference answer candidates, all of which are regarded as acceptable. Do not output anything other than a numeric score.\nScoring standards:\n- Either 1 (=correct) or 0 (=not correct)\n- To score as 1, the response must\n  > unambiguously bear correct answer(s), meanwhile\n  > does not include incorrect information.\n- Partial incorrectness = 0 (=incorrect). No mid value.\n- Repetition don't count as incorrect. Response truncation (last line cuts off) is safely ignored. Non-essential extra details in response text doesn't affect rating.\n- Unintelligible response = 0 (=incorrect)."
+    return """You are an high-level exam judge. You will be provided with a response text, a question text and a list of reference answer candidates, all of which are regarded as acceptable. Do not output anything other than a numeric score.
+Scoring standards:
+- Either 1 (=correct) or 0 (=not correct)
+- To score as 1, the response must
+    > unambiguously bear correct answer(s), meanwhile
+    > does not include incorrect information.
+- Partial incorrectness = 0 (=incorrect). No mid value.
+- Repetition don't count as incorrect. Response truncation (last line cuts off) is safely ignored. Non-essential extra details in response text doesn't affect rating.
+- Unintelligible or empty response = 0 (=incorrect)."""
 
 scoring_parameters = {"base_url": None,
                             "api_key": None,
@@ -57,7 +65,7 @@ async def model_scoring(response:str, answer: str, context: str):
     
     # We are using binary scoring, so int instead of float.
     # On "", return ""
-    return int(score) if score else score
+    return int(score) if score != "" else score
     
 def validate_scoring_model_setting():
     env_scoring_model = os.getenv("SCORING_MODEL")

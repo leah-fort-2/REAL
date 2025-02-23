@@ -1,3 +1,4 @@
+dotenv
 openpyxl==3.1.2
 requests==2.31.0
 python-dotenv==1.0.1
@@ -7,3 +8,6 @@ absl-py
 langdetect
 nltk
 immutabledict
+# Required by HumanEval
+tqdm
+numpy

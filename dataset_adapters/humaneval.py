@@ -5,9 +5,12 @@ import logging
 from external_eval_methods.humaneval_eval.evaluation import humaneval_eval_raw_pass
 from pathfinders import craft_result_path, craft_eval_dir_path
 from resultfile_logger import log_resultfile
+from text_preprocessors import clean_humaneval_preprocessor, clean_humaneval_cot_preprocessor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+RESPONSE_PREPROCESSOR = clean_humaneval_preprocessor
 
 async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
     """
@@ -41,7 +44,7 @@ async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_di
     response_set: ResponseSet = await worker(query_set, query_key=QUERY_KEY, response_key=RESPONSE_KEY).invoke()
     
     # Score judging for IFEval
-    score_entry = humaneval_eval_raw_pass(response_set, humaneval_file_path)
+    score_entry = humaneval_eval_raw_pass(response_set, humaneval_file_path, response_preprocessor=RESPONSE_PREPROCESSOR)
     score_entry.update({"dataset": DATASET_NAME, "model": MODEL})
     
     # Store (Append to) result file

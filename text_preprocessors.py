@@ -113,6 +113,27 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
                                remove_think_tags,
                                _catch_bad_cot_pipeline)
     
+def clean_humaneval_preprocessor(response: str) -> str:
+    """
+    Deals with code completion with surrounding code block syntax(```python ```)
+    """
+    return response.strip("`").lstrip("python")
+
+def clean_humaneval_cot_preprocessor(response: str) -> str:
+    """
+    Equivalent of clean_humaneval_preprocessor, but for models supporting cot, as deepseek r1 distill models.
+    """
+    def _catch_bad_cot_and_clean(s: str) -> str:
+        if s == THINK_FAILED_MSG:
+            # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
+            return THINK_FAILED_MSG
+        
+        return s.strip("`").lstrip("python")
+    
+    return preprocess_pipeline(response,
+                               remove_think_tags,
+                               _catch_bad_cot_and_clean)
+    
 def model_binary_scoring_cot_preprocessor(response: str) -> str:
     """
     Parse a binary score from a scoring cot model message into a string. e.g. "1" "0"

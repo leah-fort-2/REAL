@@ -11,6 +11,8 @@ from external_eval_methods.humaneval_eval.data import HUMAN_EVAL, read_problems,
 from external_eval_methods.humaneval_eval.execution import check_correctness
 
 import logging
+
+from text_preprocessors import clean_humaneval_preprocessor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -112,7 +114,8 @@ def humaneval_eval_raw_pass(
     response_set: ResponseSet,
     humaneval_file_path: str,
     n_workers: int = 4,
-    timeout: float = 3.0
+    timeout: float = 3.0, 
+    response_preprocessor = clean_humaneval_preprocessor
 ):
     """
     Evaluate HumanEval responses. Delegate testing to execution module (unsafe).
@@ -145,13 +148,14 @@ def humaneval_eval_raw_pass(
         for response_obj in tqdm.tqdm(responses):
             response_task_id = response_obj["task_id"]
             completion = response_obj[RESPONSE_KEY]
-            args = (problems[response_task_id], completion, timeout, completion_id[response_task_id])
+            args = (problems[response_task_id], response_preprocessor(completion), timeout, completion_id[response_task_id])
             future = executor.submit(check_correctness, *args)
             futures.append(future)
             completion_id[response_task_id] += 1
             n_samples += 1
 
-        logger.warning(f"Some problems are not attempted: {len(completion_id)}/{len(problems)}")
+        if len(completion_id) != len(problems):
+            logger.warning(f"Some problems are not attempted: {len(completion_id)}/{len(problems)}")
 
         print("Running test suites...")
         for future in tqdm.tqdm(as_completed(futures), total=len(futures)):
@@ -182,5 +186,9 @@ def humaneval_eval_raw_pass(
     k = 1
     # Only estimate pass@1 (raw pass ratio)
     pass_at_k: float = estimate_pass_at_k(total, correct, k).mean()
+    
+    # Create summary in terminal.
+    logger.info(
+            f"\n======\nEvaluation Report:\nEvaluation Name: {EVAL_NAME}\nAccuracy: {sum(correct)}/{sum(total)} (pass@1: {round(100*pass_at_k, 1)}%)\n======\n")
 
     return {"eval_name": EVAL_NAME, "score": sum(correct), "full_score": sum(total), "accuracy": pass_at_k}

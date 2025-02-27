@@ -2,6 +2,8 @@ from io_managers.csv_manager import read_from_csv, store_to_csv
 from io_managers.jsonl_manager import read_from_jsonl, store_to_jsonl
 from io_managers.xlsx_manager import read_from_excel, store_to_excel
 from io_managers.raw_file_writer import write_to_file as store_to_raw
+from io_managers.json_manager import read_from_json, store_to_json
+
 from typing import Callable
 import os
 
@@ -16,7 +18,8 @@ def get_reader(file_path:str) -> tuple[Callable[[str, list], list], str]:
     file_readers = {
         ".csv": read_from_csv,
         ".xlsx": read_from_excel,
-        ".jsonl": read_from_jsonl
+        ".jsonl": read_from_jsonl,
+        ".json": read_from_json
     }
     
     ext = os.path.splitext(file_path)[1]
@@ -39,7 +42,8 @@ def get_writer(file_path: str) -> tuple[Callable[[str, list], None], str]:
     file_writers = {
         ".csv": store_to_csv,
         ".xlsx": store_to_excel,
-        ".jsonl": store_to_jsonl
+        ".jsonl": store_to_jsonl,
+        ".json": store_to_json
     }
     ext = os.path.splitext(file_path)[1]
     writer = file_writers.get(ext)

@@ -10,26 +10,30 @@ def store_to_csv(filename: str, data_list: list[dict]):
     if not data_list:
         return
     
-    # init field names from the first data item, to retain order without using a sorting method, 
-    fieldnames = list(data_list[0])
+    existing_data = []
+    fieldnames = []
     
-    # Find additional fields
-    aggregated_fields = set()
+    # Read existing entries from the file if it exists
+    if os.path.exists(filename):
+        with open(filename, 'r', encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            existing_data = list(reader)
+            fieldnames = reader.fieldnames or []
 
-    for entry in data_list[1:]:
-        aggregated_fields = aggregated_fields.union(entry)
-                
-    for el in aggregated_fields:
-        if el not in fieldnames:
-            fieldnames.append(el)
-            
-    header_flag = not os.path.exists(filename) or os.path.getsize(filename) == 0
-    with open(filename, 'a', newline='', encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        if header_flag:
-            writer.writeheader()
-        for row in data_list:
-            writer.writerow(row)
+    # Merge existing data with new data
+    merged_data = existing_data + data_list
+
+    # Update fieldnames with new keys while preserving order
+    for entry in data_list:
+        for key in entry.keys():
+            if key not in fieldnames:
+                fieldnames.append(key)
+    
+    # IO
+    with open(filename, 'w', newline='', encoding="utf-8") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=list(fieldnames))
+        writer.writeheader()
+        writer.writerows(merged_data)
 
 def read_from_csv(filename: str, fields=[]):
     """

@@ -142,6 +142,61 @@ class QuerySet:
         updated_query_set.file_path = self.file_path
         return updated_query_set
     
+    def flatten_field(self, field_to_flatten, new_field_names=[]):
+        """
+        Suppose the field value is a list or dict. Flatten the field by assigning new/existing field names to each element in the list/dict. The original field is removed.
+        
+        With new_field_names=["Option_1",  "Option_2", "Option_3", "Option_4"]:
+        > `{"target": ["Good", "Bad", "Bad", "Bad"]}` =>  `{"Option_1": "Good", "Option_2": "Bad",  "Option_3": "Bad", "Option_4": "Bad"}`
+        
+        On dict field value, new_field_names are ignored. The dict keys are used as new field names.
+
+        > Example with dict: `{"target": {"Option_1": "Good", "Option_2": "Bad",  "Option_3": "Bad", "Option_4": "Bad"}}` => `{"Option_1": "Good", "Option_2": "Bad",  "Option_3": "Bad", "Option_4": "Bad"}`
+        
+        :params str field_to_flatten: Name of the field to flatten.
+        :params list new_field_names: New field names for elements of list value. If the field is dict, will ignore this argument and use key names as new field names.
+        :return: A new QuerySet with only flattened field updated. The original QuerySet remains unchanged.
+
+        """
+        flattened_queries = []
+        for query in self.queries:
+            if field_to_flatten not in query:
+                logger.error(f"Field '{field_to_flatten}' not found in query: {query[:50]}")
+                continue
+
+            field_value = query[field_to_flatten]
+            
+            if isinstance(field_value, list):
+                if not new_field_names:
+                    raise ValueError("List field flattening requires specifying new field names: What fields shall the list elements be placed in after the flattening?")
+                if len(field_value) > len(new_field_names):
+                    logger.warning(f"Number of elements in the list ({len(field_value)}) exceeds the number of new field names ({len(new_field_names)}). Can't flatten. Field value: {field_value[:50]}.")
+                if len(field_value) != len(new_field_names):
+                    logger.warning(f"Number of new field names ({len(new_field_names)}) does not match the number of elements in the list ({len(field_value)}). Field value: {field_value[:50]}.")
+                
+                # Update the query with the new field names and list element as values.
+                flattened_query = {k: v for k, v in query.items() if k != field_to_flatten}
+                # Will override existing fields with the same names.
+                # Zip: Match new field names as possible. Unmatched new field names are dropped.
+                # ["A", "B", "C", "D"] + ["Good", "Bad", "Bad"]=> {"A": "Good", "B": "Bad", "C": "Bad"]
+                flattened_query.update(dict(zip(new_field_names, field_value)))
+            elif isinstance(field_value, dict):
+                flattened_query = {k: v for k, v in query.items() if k != field_to_flatten}
+                # Will override existing fields with the same names.
+                overridden_keys = set(flattened_query.keys()) & set(field_value.keys())
+                if len(overridden_keys) != 0:
+                    logger.warning(f"Overriding keys {overridden_keys} in the flattened query. Field value: {field_value[:50]}. Existing keys: {flattened_query.keys()}")
+                flattened_query.update(field_value)
+            else:
+                raise TypeError(f"You can't flatten '{field_to_flatten}' ({type(field_value)}). It must be a list or dict.")
+            
+            flattened_queries.append(flattened_query)
+        
+        flattened_set = QuerySet(flattened_queries)
+        flattened_set.file_path = self.file_path
+        return flattened_set
+    
+    
     def mcq_shuffle(self, answer_key, target_answer_key, keys_to_shuffle=["A", "B", "C", "D"], target_option_keys=["A", "B", "C", "D"]):
         """
         Return a new QuerySet with specified keys shuffled. All existing keys not updated are retained. Only applies on mcq with key name as answer e.g. {"answer": "C"} but not {"answer": "answer value"}

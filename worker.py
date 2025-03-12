@@ -1,5 +1,6 @@
 from request_manager.request_manager import process_batch
 from dataset_models import QuerySet, ResponseSet
+from typing import Union, Dict, Any
 
 import os
 from dotenv import load_dotenv
@@ -9,92 +10,126 @@ load_dotenv()
 # Read fallback parameters from .env
 DEFAULT_BASE_URL = os.getenv("BASE_URL")
 DEFAULT_API_KEY = os.getenv("API_KEY")
-DEFAULT_MODEL = os.getenv("MODEL_NAME")
+DEFAULT_MODEL = os.getenv("MODEL")
 DEFAULT_TEMPERATURE = float(os.getenv("TEMPERATURE")) if os.getenv("TEMPERATURE") else None
 DEFAULT_TOP_P = float(os.getenv("TOP_P"))  if os.getenv("TOP_P") else None
 DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS"))  if os.getenv("MAX_TOKENS") else None
 DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))  if os.getenv("FREQUENCY_PENALTY") else None
 DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))  if os.getenv("PRESENCE_PENALTY") else None
+# When system prompt is left blank or None, no system message will be added to the session.
 DEFAULT_SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT")
 DEFAULT_PROMPT_PREFIX = os.getenv("PROMPT_PREFIX")
 DEFAULT_PROMPT_SUFFIX = os.getenv("PROMPT_SUFFIX")
 
 class RequestParams:
     """
-        Request parameters for OpenAI compatible APIs. If not specified, use global settings in .env file.
-        
-        - :base_url:
-        - :api_url:
-        - :api_key:
-        - :model:
-        - :temperature: It's advised to not use temperature and top_p at the same time.
-        - :max_tokens:
-        - :top_p: It's advised to not use temperature and top_p at the same time.
-        - :frequency_penalty:
-        - :presence_penalty:
-    """
-    def __init__(self, 
-                 base_url=DEFAULT_BASE_URL, 
-                 api_key=DEFAULT_API_KEY, 
-                 model=DEFAULT_MODEL,
-                 temperature=DEFAULT_TEMPERATURE,
-                 top_p=DEFAULT_TOP_P,
-                 max_tokens=DEFAULT_MAX_TOKENS,
-                 frequency_penalty=DEFAULT_FREQUENCY_PENALTY,
-                 presence_penalty=DEFAULT_PRESENCE_PENALTY,
-                 system_prompt=DEFAULT_SYSTEM_PROMPT,
-                 prompt_prefix=DEFAULT_PROMPT_PREFIX,
-                 prompt_suffix=DEFAULT_PROMPT_SUFFIX
-                 ):
-        """
-        Create a request parameter instance for initializing a worker. On unspecified parameters, use global settings in .env file. Use None to explicitly ignore a parameter.
-        
-        :params base_url: Base url for OpenAI compatible APIs. e.g. `https://api.openai.com/v1`
-        :params api_key: API key for OpenAI compatible APIs.
-        :params model: The model to request to.
-        :params temperature: Temperature parameter. It's advised to not use temperature and top_p at the same time.
-        :params top_p: Top P parameter. It's advised to not use temperature and top_p at the same time.
-        :params max_tokens: Max tokens to generate per request before cutoff.
-        :params frequency_penalty: Frequency penalty parameter.
-        :params presence_penalty: Presence penalty parameter.
-        :params system_prompt: A system prompt text with `role: "system"`
-        :params prompt_prefix: Prefix to prepend to requests
-        :params prompt_suffix: Suffix to append to requests
+    A class to manage and validate request parameters for API calls.
 
+    This class handles the initialization, validation, and storage of various
+    parameters used in API requests. It ensures type safety for predefined
+    attributes and allows for dynamic addition of custom attributes.
+    Attributes:
+        base_url (str): The base URL for the API.
+        api_key (str): The API key for authentication.
+        model (str): The model to be used for the request.
+        temperature (Union[float, int]): The sampling temperature.
+        top_p (Union[float, int]): The nucleus sampling parameter.
+        max_tokens (int): The maximum number of tokens to generate.
+        frequency_penalty (Union[float, int]): The frequency penalty parameter.
+        presence_penalty (Union[float, int]): The presence penalty parameter.
+        api_url (str): (Generated automatically) The full API URL, constructed from base_url.
+
+    The class also allows for addition of custom attributes not listed above.
+    """
+    _attribute_types = {
+        'base_url': str,
+        'api_key': str,
+        'model': str,
+        'temperature': Union[float, int],
+        'top_p': Union[float, int],
+        'max_tokens': int,
+        'frequency_penalty': Union[float, int],
+        'presence_penalty': Union[float, int],
+        'api_url': str
+    }
+
+    def __init__(self, **kwargs):
         """
-        self.api_url = base_url + "/chat/completions"
-        self.api_key = api_key
-        self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.top_p = top_p
-        self.frequency_penalty = frequency_penalty
-        self.presence_penalty = presence_penalty
-        self.system_prompt = system_prompt
-        self.prompt_prefix = prompt_prefix
-        self.prompt_suffix = prompt_suffix
-        
-    def get_params(self):
+        Initialize the RequestParams instance.
+
+        :param kwargs: Keyword arguments for setting initial attribute values.
+                       If not provided, default values from environment variables are used.
         """
-        Return the parameters to initialize this request parameter instance. Modifying it does not affect internal parameters.
+        self.base_url = self._validate_type('base_url', kwargs.get('base_url', DEFAULT_BASE_URL))
+        self.api_key = self._validate_type('api_key', kwargs.get('api_key', DEFAULT_API_KEY))
+        self.model = self._validate_type('model', kwargs.get('model', DEFAULT_MODEL))
+        self.temperature = self._validate_type('temperature', kwargs.get('temperature', DEFAULT_TEMPERATURE))
+        self.top_p = self._validate_type('top_p', kwargs.get('top_p', DEFAULT_TOP_P))
+        self.max_tokens = self._validate_type('max_tokens', kwargs.get('max_tokens', DEFAULT_MAX_TOKENS))
+        self.frequency_penalty = self._validate_type('frequency_penalty', kwargs.get('frequency_penalty', DEFAULT_FREQUENCY_PENALTY))
+        self.presence_penalty = self._validate_type('presence_penalty', kwargs.get('presence_penalty', DEFAULT_PRESENCE_PENALTY))
         
-        :return dict[str, Any]:
+        self.api_url = self._validate_type('api_url', f"{self.base_url}/chat/completions")
+        
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, value)
+
+    def _validate_type(self, name: str, value: Any) -> Any:
         """
-        params = {
-            "api_url": self.api_url,
-            "api_key": self.api_key,
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "top_p": self.top_p,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty,
-            "system_prompt": self.system_prompt,
-            "prompt_prefix": self.prompt_prefix,
-            "prompt_suffix": self.prompt_suffix
-        }
-        return {k: v for k, v in params.items() if v is not None}
-        
+        Validate the type of a given value against the expected type.
+
+        :param name: The name of the attribute being validated.
+        :param value: The value to validate.
+        :return: The validated value.
+        :raises TypeError: If the value does not match the expected type.
+        """
+        if value is not None:
+            expected_type = self._attribute_types.get(name)
+            if expected_type and not isinstance(value, expected_type):
+                    raise TypeError(f"{name} must be of type {expected_type}")
+        return value
+
+    def __setattr__(self, name: str, value: Any):
+        """
+        Set an attribute with type validation.
+
+        :param name: The name of the attribute to set.
+        :param value: The value to set the attribute to.
+        :raises TypeError: If the value does not match the expected type for predefined attributes.
+        """
+        self._validate_type(name, value)
+        super().__setattr__(name, value)
+
+    def get_params(self) -> Dict[str, Any]:
+        """
+        Get a dictionary of all non-None parameters.
+
+        :return: A dictionary containing all attributes with non-None values.
+        """
+        return {k: v for k, v in self.__dict__.items() if v is not None}
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Custom attribute access method to raise an AttributeError for non-existent attributes.
+
+        :param name: The name of the attribute to get.
+        :raises AttributeError: If the attribute does not exist.
+        """
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    def __delattr__(self, name: str):
+        """
+        Delete an attribute if it exists.
+
+        :param name: The name of the attribute to delete.
+        :raises AttributeError: If the attribute does not exist.
+        """
+        if hasattr(self, name):
+            super().__delattr__(name)
+        else:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
 class Worker:
     class Job:
         """
@@ -137,7 +172,7 @@ class Worker:
             query_string_list = [query[query_key] for query in queries]
             
             # Launch requests
-            params = worker.get_params()
+            params: dict[str, Any] = worker.get_params()
             response_list = await process_batch(query_string_list, params)
             
             # Post works

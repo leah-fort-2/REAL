@@ -106,5 +106,5 @@ judging_method: {final_values['judging_method']}"""
         log_failed_msg()
         
 def escape(str):
-    state = str.replace(':', '\\:').replace("\n", "\\n")
+    state = str.replace("\n", "\\n")
     return state

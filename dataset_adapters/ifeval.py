@@ -4,10 +4,12 @@ import os
 import logging
 from external_eval_methods.instruction_following_eval.evaluation_main import ifeval_judge_strict
 from pathfinders import craft_result_path, craft_eval_dir_path
+from text_preprocessors import as_is
 from resultfile_logger import log_resultfile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+RESPONSE_PREPROCESSOR=as_is
 SCORING_BATCH_SIZE = int(os.getenv("SCORING_BATCH_SIZE", "5"))
 
 async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
@@ -43,7 +45,7 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
     response_set: ResponseSet = await worker(query_set, query_key=QUERY_KEY, response_key=RESPONSE_KEY).invoke()
     
     # Score judging for IFEval
-    score_entry = ifeval_judge_strict(response_set, ifeval_src_file_path)
+    score_entry = ifeval_judge_strict(response_set, ifeval_src_file_path, response_preprocessor=RESPONSE_PREPROCESSOR)
     score_entry.update({"dataset": DATASET_NAME, "model": MODEL})
     
     # Store (Append to) result file

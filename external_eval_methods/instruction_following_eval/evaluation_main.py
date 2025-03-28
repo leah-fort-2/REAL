@@ -19,7 +19,7 @@ import collections
 import dataclasses
 import json
 import os
-from typing import Dict, Optional, Sequence, Union
+from typing import Dict, Optional, Sequence, Union, Callable
 
 from absl import app
 from absl import flags
@@ -299,7 +299,7 @@ def main(argv):
     print(f"{output_file_name} Accuracy Scores:")
     print_report(outputs)
     
-def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
+def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str, response_preprocessor: Callable[[str], str]):
   """
   Still an adapter style score judging method. Paired with dataset_model module to incorporate into the workflow.
   
@@ -321,7 +321,7 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
   prompt_to_response = {}
   [prompt_to_response.update(
     {resp_obj[query_key] # The prompt
-        : resp_obj[response_key]}) # The response
+        : response_preprocessor(resp_obj[response_key])}) # The response
         for resp_obj in responses]
 
   # test if accuracy
@@ -338,8 +338,10 @@ def ifeval_judge_strict(response_set: ResponseSet, ifeval_eval_file_path: str):
         outputs.append(output_example)
         # Score calculation
         score: bool = output_example.follow_all_instructions
+        processed_response: str = output_example.response
         resp_obj.update({
-          f"score": 1 if score else 0}
+          "score": 1 if score else 0,
+          "processed_response": processed_response}
         )
     # Finished updating all resp objs in ResponseSet.
     

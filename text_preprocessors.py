@@ -331,13 +331,13 @@ def search_for_answer(s: str):
     return ""
     
 def remove_think_tags(s: str):
-    removed = re.sub("<[Tt]hink>.*</[Tt]hink>", "", s, flags=re.DOTALL)
+    removed = re.sub(".*</[Tt]hink>", "", s, flags=re.DOTALL)
     
     # If no cot is parsed at all, return a fallback message string.
     if len(removed) == len(s):
         logger.warning(f"Encountered malformed cot section. The cot is likely incomplete. Will fall back to think failed msg.")
         return THINK_FAILED_MSG
-    return removed
+    return removed.lstrip("\n")
 
 def filter_bad_option_letters(s: str):
     """

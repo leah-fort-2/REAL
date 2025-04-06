@@ -10,6 +10,7 @@ from text_preprocessors import clean_humaneval_preprocessor, clean_humaneval_cot
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# HumanEval has dedicated preprocessing methods. clean_humaneval_preprocessor is for non-cot eval and the other one, you bet.
 RESPONSE_PREPROCESSOR = clean_humaneval_preprocessor
 
 async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):

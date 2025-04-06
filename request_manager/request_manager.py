@@ -14,6 +14,18 @@ FALLBACK_ERR_MSG = "Unknown error in processing request"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class RequestResourceManager:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(RequestResourceManager, cls).__new__(cls)
+            cls._instance.semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS) if MAX_CONCURRENT_REQUESTS > 0 else None
+        return cls._instance
+
+    def get_semaphore(self) -> asyncio.Semaphore:
+        return self._instance.semaphore
+
 async def process_batch(request_list: list[str], request_params: dict):
     """
     Process a list of request strings asynchronously, with a semaphore of size BATCH_SIZE set in .env file.
@@ -22,7 +34,7 @@ async def process_batch(request_list: list[str], request_params: dict):
     :param request_params: Request parameters in body e.g. temperature
     :return: a list of response strings, or error messages
     """
-    semaphore = None if MAX_CONCURRENT_REQUESTS == 0 else asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    semaphore = RequestResourceManager().get_semaphore()
     batch_total = len(request_list)
     async with aiohttp.ClientSession() as session:
         tasks = [_process_request(request, request_params, session, semaphore=semaphore, request_id=f"{i + 1}/{batch_total}") for i, request in enumerate(request_list)]

@@ -3,7 +3,8 @@ from text_preprocessors import as_is
 from judgers.presets import STRICT_MATCH, JUDGE_FAILED_MSG
 from request_manager.request_manager import FALLBACK_ERR_MSG
 from random import shuffle
-from typing import Callable
+from typing import Any, Callable, Coroutine
+from collections import defaultdict
 import logging
 import dotenv
 import asyncio
@@ -28,6 +29,9 @@ class QuerySet:
         :return: A new list of dictionaries containing only the specified fields.
         """
         return [{field: query[field] for field in field_names if field in query} for query in query_list]
+    
+    def _append(self, query: dict[str, Any]) -> None:
+        self.queries.append(query)
 
     def __init__(self, file_path_or_query_list: str | list[dict] | list[str], field_names=[]):
         """
@@ -104,7 +108,7 @@ class QuerySet:
         """
         return [query[query_key] for query in self.get_queries()]
     
-    def divide(self, division_size=10) -> list:
+    def divide(self, division_size=10) -> list['QuerySet']:
         """
         Split an entire query set into divisions with remainders e.g. `[10, 10, 10, 5]`. Subsets inherit all fields and file path from the parent set. 
         
@@ -112,6 +116,44 @@ class QuerySet:
         :return: a list of (less than or equal to) division-sized query subset.
         """
         return [self[i:i + division_size] for i in range(0, len(self), division_size)]
+    
+    def divide_by_key(self, division_key: str, ignore_unsorted=False) -> dict[str, 'QuerySet']:
+        """
+        Split an entire query set by a given key e.g. `category: math`. Subsets inherit all fields and file path from the parent set.
+        
+        :params str division_key: based on this key e.g. `category` a division will be conducted
+        :params bool ignore_unsorted: in case the division_key is not found in any query object. True: keep it in "unsorted" key and continue; False: halt the division.
+        :return: a dict of query sets each with a distinct identifier of the given key
+        """
+        return dict(self.divide_by_keys([division_key], completeness=ignore_unsorted))
+        
+    def divide_by_keys(self, division_keys: list[str], completeness=True) -> dict[str, 'QuerySet']:
+        """
+        Split an entire query set by specific keys e.g. `category: math; discipline: algebra` => `{"math/algebra": QuerySet}`. Subsets inherit all fields and file path from the parent set.
+        
+        :params list[str] division_keys: based on these keys e.g. `category, discipline` a division will be conducted SEQUENTIALLY
+        :params bool completeness: in case any query object isn't complete with all division keys. e.g. with `division_keys=["category", "discipline"]` and `query={"category": "math"}`, True: Add the orphan query to the "unsorted" leaf of the "category" node. False: halt the division.
+        :return: a flattened tree-shaped dict of distinct keys with query set objects on leaf nodes e.g. `{"math/algebra/abstract": QuerySet}`
+        """
+        def create_default_query_set():
+            default_query_set = QuerySet([])
+            default_query_set.file_path=self.get_path()
+            return default_query_set
+        
+        all_queries_categorized = defaultdict(create_default_query_set)
+        for query in self.queries:
+            identifiers = []
+            for i, division_key in enumerate(division_keys):
+                division_value = query.get(division_key, "unsorted")
+                identifiers.append(division_value)
+                key_not_found = division_value == "unsorted"
+                if key_not_found and completeness == False:
+                    logger.error(f"Completeness is selected and specified key {division_key} is not found in the following query object. Division halted. \n{query}")
+                    return
+                if key_not_found or i == len(division_keys) - 1:
+                    all_queries_categorized["/".join(identifiers)]._append(query)
+        
+        return all_queries_categorized
     
     def merge_keys(self, key_list_to_merge, merged_key_name, with_key_names=True):
         """
@@ -295,15 +337,15 @@ class ResponseSet:
         :params answer_key: Specify the field name for answer. Default to "answer"
         :params str context_key: Optional. Specify the field name for context. Default to None. If left as None, context_key will fall back to query_key. If query_key is not specified, context_key will be ignored.
         :params eval_name: Only for generating report on the terminal. e.g. "accountant_val" "agronomy". Default to "Evaluation"
-        :params (str -> str) response_preprocessor:
+        :params Callable[str -> str] response_preprocessor:
 
           - Preprocess the response before submitting to the judger method. e.g. `mcq_preprocessor`, etc. Default to `as_is`. See text_preprocessors module. 
           
-        :params (str -> str) answer_preprocessor:
+        :params Callable[str -> str] answer_preprocessor:
           - Same as response, but for answer.
-        :params ((response:str, answer:str, context=str) -> str) judger:
+        :params Callable[[str, str, str], Coroutine[Any, Any, float | str]] judger:
         
-          - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score. Default to STRICT_MATCH.
+          - Takes two strings and an optional context string (for model scoring). Output a [0,1] accuracy score (model scoring may return a JUDGE_FAILED_MSG: str). Default to STRICT_MATCH.
           
         :params str foreign_response_key: Default to None. Retrieve specified key value instead of the response_key set on instantiation. Default to None.
 
@@ -374,7 +416,7 @@ class ResponseSet:
         
         return True
     
-    async def _judge_single_resp_obj(self, resp_obj, response_key, answer_key, context_key, response_preprocessor, answer_preprocessor, judger, semaphore=None):
+    async def _judge_single_resp_obj(self, resp_obj, response_key, answer_key, context_key, response_preprocessor: Callable[[str], str], answer_preprocessor: Callable[[str], str], judger: Callable[[str, str, str], Coroutine[Any, Any, float | str]], semaphore=None):
         response = resp_obj[response_key]
         correct_answer = resp_obj[answer_key]
         # context_key has been validated to be either 1) an existing key in response 2) fallback to query_key or 3) None. Ensure None safety before retrieval
@@ -431,7 +473,10 @@ class ResponseSet:
             # Skip the question in scoring
             return SKIPPED
         
-        resp_obj.update({f"score": score})
+        resp_obj.update({
+            "judged_content": preprocessed_response,
+            "score": score
+            })
         return JUDGED(score)
 
     

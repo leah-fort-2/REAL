@@ -7,6 +7,9 @@
   - [Workflow Orchestration in Adapters](#workflow-orchestration-in-adapters)
   - [Timeout, max attempts and batch size](#timeout-max-attempts-and-batch-size)
   - [Extensibility](#extensibility)
+  - [Appendix](#appendix)
+    - [Text Preprocessors](#text-preprocessors)
+    - [Evaluation Defaults](#evaluation-defaults)
 
 ## About
 
@@ -63,22 +66,26 @@ Happy evaluation!
 
 ## Example Usage
 
-REAL starts at `run.py`. It gives you plenty of flexibility in workflow, but meanwhile requires you to do some orchestration:
+> It is strongly advised to run with test_mode=True first. This can prevent unexpected behavior during evaluation, and if you plan to use max_subset_size for each subset of a greater dataset, this can provide an overview and help you decide a reasonable max_subset_size.
+
+REAL starts at `run.py`. It gives you plenty of flexibility in workflow, but meanwhile requires you to do some over-the-loop work.
+
+For tailored workflows, be sure to create custom `run_*.py` files.
 
 1. **Create an .env file**: Look at .env.example which has all the required env variables. Duplicate it, create a `.env`, and fill in your own values.
 
-2. **Locate a dataset**: Take your own datasets. Put it in `datasets` directory (nested directories are supported).
-> Currently, REAL provides a limited bunch of preset adapters. But theoretically you can use REAL for any xlsx/csv/jsonl dataset.
+2. **Locate a dataset**: Take your own datasets. Put it in `datasets` directory (nested directories are supported).<br/>Currently, REAL provides a limited bunch of preset adapters. But theoretically you can use REAL for any xlsx/csv/jsonl dataset.<br/>
+You might need to implement your own adapter for dataset structures other than the typical mcq scheme `[question, a,  b, c, d, answer]`. See "Workflow Orchestration in Adapters" for guidance in creating one.
 
-> You might need to implement your own adapter for dataset structures other than the typical mcq scheme `[question, a,  b, c, d, answer]`. Keep reading for how an adapter is constructed in REAL.
-
-1. **Create a worker @`run.py`** :A worker takes a `RequestParams` instance which is its profile. It will `invoke` requests following this profile.
+3. **Create a worker @`run.py`** :A worker takes a `RequestParams` instance which is its profile. It will `invoke` requests following this profile.
 > If you wish to not use certain parameters, either 1) leave them as blank in .env file, or 2) explicitly use `None` at runtime. e.g. Avoid top_p when using temperature.
+> Find some handy prompts in prompts/
 
-1. **Call an adapter @`run.py`**: An adapter wraps the evaluation logic and takes
+4. **Call an adapter @`run.py`**: An adapter wraps the evaluation logic and takes
     - **the dataset directory**
     - **the worker**
-    - optional parameters required by specific datasets
+    - **response preprocessor**: This shall process the responses before evaluating, extract the answer body, etc.
+    - optional parameters required by specific datasets, see respective docstrings
     - test mode: only evaluating the first 10 questions
 
 Optionally, you can start from `run_custom.py` (for evaluating single custom file) or `run_requests_only.py` (for batch requests without score judging). Go check the entrance files, they are pretty self-explanatory.
@@ -93,7 +100,7 @@ dataset_path = "path/to/mmlu/dataset"
 worker_profile = RequestParams(
   model="deepseek-chat",
   temperature=0,
-  max_tokens=128,
+  max_tokens=2048,
   frequency_penalty=0
   system_prompt="You are a helpful assistant."
 )
@@ -101,7 +108,7 @@ worker_profile = RequestParams(
 industrious_worker = Worker(worker_profile)
 
 # Call an adapter
-await conduct_mmlu(dataset_path, worker)
+await conduct_mmlu(dataset_path, worker, response_preprocessor = mcq_search_preprocessor, max_subset_size = 50)
 ```
 
 ## Workflow Orchestration in Adapters
@@ -118,12 +125,13 @@ Read through to learn how to customize an adapter. An adapter is dedicated to th
 - Merge dataset fields if needed. Designed for mcq datasets, `QuerySet` implemented `merge_keys` that connects field names/values with linebreakers.
 - Call workers with a `QuerySet` instance and a query field name (which field to request, default to `query`). This creates a `Job`. A `Job` can be `invoke`d to fetch all llm responses and returns them in a `ResponseSet` instance.
   - Orchestrate multiple workers here.
+  - (Recommended) Use `asyncio.gather` to run concurrent evaluations.
 
 **Post**
 
 - Call `ResponseSet` method `store_to` with an output path. (supported format: csv, xlsx, jsonl) Storing full response records is highly advised for archiving purposes.
 - Call `ResponseSet` async method `judge` with 1) an answer field and 2) an eval name (for marking each subset record) to do score judging. The `judge` method will return a literal dictionary containing scoring info.
-  - You may specify a response_processor (default: as_is) / answer_processor (default: as_is) / judger (default: `STRICT_MATCH`) as you need. 
+  - Be sure to specify a response_processor (default: `as_is`) / answer_processor (default: `as_is`) / judger (default: `STRICT_MATCH`) as you need, unless you are dealing with evaluations where response overhead & redundant parts matter, like in `ifeval`.
   - Some preprocessors are ready at `dataset_adapters.response_preprocessors`.
 - Spawn a `ResponseSet` instance with the judge result dictionary to `store_to` a score output file.
 - Lastly, log the metadata of evaluation(s). Method `log_resultfile` is provided for templated log files.
@@ -169,7 +177,7 @@ MAX_ATTEMPTS=3
 
 - **Batch size**: When a query set is submitted to an api, its concurrent request number is limited to `BATCH_SIZE` by a semaphore. 
 
-NOTE: The semaphore is JOB-SPECIFIC: each job launches a process_batch which has a semaphore, so 2 jobs invoked at a time can launch `2 * BATCH_SIZE` concurrent requests.
+NOTE: The semaphore is global. If two tasks run through two apis concurrently, they share the max batch size. `SCORING_BATCH_SIZE` works only for scoring and is independent.
 
 ```bash
 BATCH_SIZE=5
@@ -191,14 +199,25 @@ Many of these external modules use file I/O to retrieve/export evaluation proces
 
 ## Appendix
 
+### Text Preprocessors
+
+| Preprocessor Name | Feature | Example |
+| --- | --- | --- |
+| `as_is` | Keep the response as is. | "Answer: B and more" => "Answer: B and more" |
+| `mcq_search_preprocessor` | Search for content between `<answer>` and `</answer>`, then pick the first letter if independent. | `"Gibberish answer. <answer> A. Something. </answer>"` => `"A"`|
+| `mcq_preprocessor` | Pick the first, then the last "independent letter" in order. Fall back to `""`. | `"Answer: B and more"` => `""`<br/>`"A\nThis is the answer."` => `"A"` |
+| `mcq_cot_preprocessor` | Remove the cot content (surrounded by <think></think>, on failure, return `THINK FAILED MESSAGE`), then run `mcq_preprocessor`. | `"<think>Man! What can I say.</think>B"` => `"B"`|
+| `mcq_cot_preprocessor_for_bad_if` | Remove multiple MCQ answers first e.g. "AB" "B, C", then run `mcq_cot_preprocessor`. If the latter failed, run search for `[Aa]nswer:([^\\w]*?)([A-Za-z]+)` and `答案[：:]([^\\w]*?)([A-Za-z]+)`, and `pick_the_first_letter_if_independent`. Fall back to `""`. | `"Gibberish answer. Answer: B. "` => `"B"`<br>`"Gibberish answer. Gibberish answer. The answer is: B"` => `""`|
+
 ### Evaluation Defaults
 
 | Eval Name | Temperature | System Prompt | Prompt Prefix | Prompt Suffix | Max Tokens | Judge |
 | --- | --- | --- | --- | --- | --- | --- |
-| ceval | 0.0 | 你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出正确选项对应的字母，不要给出任何其他内容。 | | |128|STRICT_MATCH|
-| cmmlu | 0.0 | 你是一位审题专家，请根据选择题内容，根据对应的专业知识，在A/B/C/D四个选项中，选出正确选项对应的字母，不要给出任何其他内容。 | | |128|STRICT_MATCH|
-| mmlu | 0.0 | You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content. | | |128|STRICT_MATCH|
-| gpqa | 0.0 | You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content. | | |128|STRICT_MATCH|
+| ceval | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |2048|STRICT_MATCH|
+| cmmlu | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |2048|STRICT_MATCH|
+| mmlu | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
+| gpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
 | ifeval | 0.0 |  | | |2048|ifeval_judge_strict|
-| mmlu_pro | 0.0 | You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content. | | |128|STRICT_MATCH|
+| mmlu_pro | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
 | humaneval | 0.0 | You are a coder. Complete the following code block according to the docstring with proper indentation. Provide ONLY the completion without additional content.\n | | \# YOUR COMPLETION STARTS HERE\n |512|humaneval_eval_raw_pass|
+| supergpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | | 2048 | STRICT_MATCH|

@@ -1,17 +1,20 @@
 import os
 from dataset_models import QuerySet, ResponseSet
 from worker import Worker
+from typing import Callable
 from pathfinders import list_files_in_directory, craft_result_path, craft_eval_dir_path, parse_filename_from_path
-from text_preprocessors import mcq_preprocessor, mcq_cot_preprocessor_for_bad_if
 from judgers.presets import STRICT_MATCH
 from resultfile_logger import log_resultfile
 import asyncio
 from random import shuffle
+import logging
 
-RESPONSE_PREPROCESSOR=mcq_preprocessor
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 JUDGER=STRICT_MATCH
 
-async def conduct_gpqa(dataset_dir: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
+async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
     """
     Conduct a gpqa test. Before evaluation, create a worker instance.
     
@@ -23,12 +26,17 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, results_dir="results", 
     - Evaluation format supported: depend on ResponseSet.store_to method
     
     :params worker: The industrious worker.
+    :params Callable[[str], str] response_preprocessor: Preprocess model responses before they go to the court. Select on your need.
     :params results_dir: Store evaluation results in this directory. e.g. results/gpqa/athene-v2-chat/test-athene-v2-chat-gpqa_main.xlsx
     :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
     :params test_mode: only first 10 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
     """
     DATASET_NAME = "gpqa"
     MODEL = worker.get_params()["model"]
+    
+    # # !!!Override the model name to bypass the vllm inline model loading!!!
+    # worker.request_params.model = "gemma-3-27b-it-gptq-4.0bit-128g"
+    
     # Check if both dataset_dir and results_dir exist
     if not os.path.isdir(dataset_dir):
         raise FileNotFoundError(f"Dataset directory is not found: {dataset_dir}")
@@ -52,7 +60,7 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, results_dir="results", 
         # Use query set path basename as eval name as each subset should have its distinctive name.
         score_result = await response_set.judge(answer_key=target_answer_key, 
                                           eval_name=f"{parse_filename_from_path(subset_path)}",
-                                          response_preprocessor = RESPONSE_PREPROCESSOR,
+                                          response_preprocessor = response_preprocessor,
                                           judger=JUDGER)
         
         # Store response with score info updated in response_set
@@ -61,11 +69,12 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, results_dir="results", 
         score_result.update({"dataset": DATASET_NAME, "model": MODEL})
         ResponseSet([score_result]).store_to(score_output_path)
         
-    # Create QuerySet instances from dataset paths
+    # Create QuerySet instances from dataset paths (in this case, only one for GPQA)
     datasets = list_files_in_directory(dataset_dir, ".csv")
     
     # Test mode: Only the first subset will be evaluated.
     if test_mode:
+        preview_eval_counts([QuerySet(subset_path) for subset_path in datasets])
         datasets = [datasets[0]]
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
@@ -100,7 +109,7 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, results_dir="results", 
     def log():
         params = {
             "test_set_type": "mcq",
-            "judging_method": RESPONSE_PREPROCESSOR.__name__
+            "judging_method": response_preprocessor.__name__
         }
         eval_dir = craft_eval_dir_path(results_dir, DATASET_NAME, MODEL)
         log_resultfile(DATASET_NAME, worker, eval_dir, params=params)
@@ -146,9 +155,12 @@ def create_shuffled_gpqa_query_set(gpqa_dataset: QuerySet, original_answer_key: 
     # We are calling an internal property outside the class. This isn't the best practice, but it won't harm the performance, so use it for now.
     shuffled_dataset.file_path = gpqa_dataset.get_path()
     return shuffled_dataset
-    
-def make_system_prompt():
-        return f"You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content."
 
-def make_suffix():
-    return f"\nThe correct answer is: "
+def preview_eval_counts(query_set_list: list[QuerySet]):
+    preview_message = f"""
+    ======EVAL CHECKLIST======
+    |\tEval name\t|\tSize\t|
+    {"\n".join([f"|\t{query_set.get_path()}\t|\t{len(query_set)}|" for query_set in query_set_list])}
+    ============
+    """
+    logger.info(preview_message)

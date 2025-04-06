@@ -4,13 +4,14 @@ import os
 import logging
 from external_eval_methods.instruction_following_eval.evaluation_main import ifeval_judge_strict
 from pathfinders import craft_result_path, craft_eval_dir_path
-from text_preprocessors import as_is
+from text_preprocessors import as_is, remove_think_tags
 from resultfile_logger import log_resultfile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-RESPONSE_PREPROCESSOR=as_is
-SCORING_BATCH_SIZE = int(os.getenv("SCORING_BATCH_SIZE", "5"))
+
+# IfEval does not need response preprocessing (use as_is) unless you are evaluating reasoning models.
+RESPONSE_PREPROCESSOR=remove_think_tags
 
 async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
     """

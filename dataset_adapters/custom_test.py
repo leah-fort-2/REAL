@@ -4,8 +4,12 @@ from pathfinders import parse_filename_from_path, sanitize_pathname
 import os
 from judgers.presets import STRICT_MATCH
 from text_preprocessors import as_is
+import logging
 
-async def run_test(test_file_path: str, workers: list[Worker], output_dir="results/custom_tests",test_mode=False, judging_algorithm=STRICT_MATCH, judging_preprocessor=as_is, query_key="query", answer_key="answer"):
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+async def run_test(test_file_path: str, workers: list[Worker], output_dir="results/custom_tests",test_mode=False, judging_algorithm=STRICT_MATCH, response_preprocessor=as_is, query_key="query", answer_key="answer"):
     """
     Conduct a custom evaluation with a test data file. Support xlsx, csv and jsonl.
 
@@ -14,7 +18,7 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
     :params str output_dir: Store result file in this directory. Default to: results/custom_tests
     :params bool test_mode: only the first subset under dataset_dir will be tested. Only for debug purposes.
     :params judging_algorithm: The judging algorithm used for score judging. Preset: STRICT_MATCH (for A == A), TEXT_SIMILARITY (based on minimal editing steps), and MODEL_SCORING (submitted to a judger model).
-    :params judging_preprocessor: Preprocess the response before score judging. Default to as_is.
+    :params response_preprocessor: Preprocess the response before score judging. Default to as_is.
     :params query_key: The key for evaluation queries. Set as your query file requires.
     :params answer_key: Conduct score judging based on this key. Required for score judging.
     """
@@ -29,11 +33,11 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
         raise ValueError(f"Answer_key is required for score judging. Got {answer_key}.")
     
     query_set = QuerySet(test_file_path)
+    preview_eval_counts([query_set])
     
     if test_mode:
         query_set = query_set[:10]
         output_dir = os.path.join("test/", output_dir)
-        
             
     QUERY_SET_NAME = parse_filename_from_path(test_file_path)
     # For aggregated output
@@ -66,10 +70,19 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
         await aggregated_response_set.judge(answer_key=answer_key,
                                       context_key=query_key,
                                       eval_name=model_eval_name,
-                                      response_preprocessor=judging_preprocessor,
+                                      response_preprocessor=response_preprocessor,
                                       judger=judging_algorithm,
                                       foreign_response_key=model_response_key)
     
     output_path = os.path.join(output_dir, sanitize_pathname(f"{QUERY_SET_NAME}_results.xlsx"))
     
     aggregated_response_set.store_to(output_path)
+    
+def preview_eval_counts(query_set_list: list[QuerySet]):
+    preview_message = f"""
+    ======EVAL CHECKLIST======
+    |\tEval name\t|\tSize\t|
+    {"\n".join([f"|\t{query_set.get_path()}\t|\t{len(query_set)}|" for query_set in query_set_list])}
+    ============
+    """
+    logger.info(preview_message)

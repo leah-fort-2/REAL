@@ -13,12 +13,33 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 THINK_FAILED_MSG = "Thinking process failed."
+ANSWER_FAILED_MSG = "No valid answer field was found. Fall back to false."
 
 def as_is(response: str):
     """
     No preprocessing, no validation, just "as-is".
     """
     return response
+
+def mcq_search_preprocessor(response: str):
+    """
+    mcq preprocessor that works with <answer> </answer> tags.
+    On failure to extract answer tags, fall back to an error msg that results in 0 point.
+    """
+    def _extract_answer(s: str):
+        # Remove latex boxed statement e.g. `\boxed{A}`
+        unboxed = s.replace("\\boxed", " ")
+
+        pattern = f"<[Aa]nswer>([^\\w]*?)([A-Za-z]+).*</[Aa]nswer>"
+        match = re.search(pattern, unboxed, re.DOTALL)
+        if match != None:
+            # Only pick if the first letter of the group is independent. e.g. `Answer: A` but not `Answer: Shark` 
+            state = pick_first_letter_if_independent(match.group(2))
+            if state:
+                return state.upper()
+        return ANSWER_FAILED_MSG
+    
+    return preprocess_pipeline(response, _extract_answer)
 
 def mcq_preprocessor(response: str):
     """

@@ -1,15 +1,14 @@
-from dataset_adapters.ifeval import conduct_ifeval
 from worker import RequestParams, Worker
 from dotenv import load_dotenv
 import asyncio
 import os
-from dataset_adapters.ceval_val import conduct_ceval_val, make_system_prompt as make_ceval_system_prompt
-from dataset_adapters.cmmlu import conduct_cmmlu, make_system_prompt as make_cmmlu_system_prompt
-from dataset_adapters.mmlu import conduct_mmlu, make_system_prompt as make_mmlu_system_prompt
-from dataset_adapters.gpqa import conduct_gpqa, make_system_prompt as make_gpqa_system_prompt, make_suffix as make_gpqa_suffix
+from dataset_adapters.ifeval import conduct_ifeval
+from dataset_adapters.cmmlu import conduct_cmmlu
 from dataset_adapters.humaneval import conduct_humaneval, make_system_prompt as make_humaneval_system_prompt, make_prompt_suffix as make_humaneval_suffix
-from dataset_adapters.mmlu_pro import conduct_mmlu_pro, make_system_prompt as make_mmlu_pro_system_prompt
-from dataset_adapters.supergpqa import conduct_supergpqa, make_system_prompt as make_supergpqa_system_prompt, make_prompt_suffix as make_supergpqa_suffix
+from dataset_adapters.mmlu_pro import conduct_mmlu_pro
+from dataset_adapters.supergpqa import conduct_supergpqa
+from prompts import make_en_system_prompt as make_system_prompt, make_en_cot_system_prompt as make_cot_system_prompt, make_en_reasoning_suffix as make_reasoning_suffix
+from text_preprocessors import mcq_search_preprocessor
 
 load_dotenv()
 
@@ -25,7 +24,7 @@ prompt specifics are configured in the respective adapter file, as they do be qu
 
 BASE_URL = os.getenv("BASE_URL")
 API_KEY = os.getenv("API_KEY")
-MODEL = os.getenv("MODEL")
+MODEL = "deepseek-chat"
 
 async def main():
     
@@ -42,34 +41,12 @@ async def main():
     # 
     # Worker creation
     # 
-    ceval_val_worker_profile = RequestParams(
-        base_url=BASE_URL,
-        api_key=API_KEY,
-        model=MODEL,
-        max_tokens=128,
-        system_prompt=make_ceval_system_prompt()
-    )
     cmmlu_worker_profile = RequestParams(
         base_url=BASE_URL,
         api_key=API_KEY,
         model=MODEL,
-        max_tokens=128,
-        system_prompt=make_cmmlu_system_prompt()
-    )
-    mmlu_worker_profile = RequestParams(
-        base_url=BASE_URL,
-        api_key=API_KEY,
-        model=MODEL,
-        max_tokens=128,
-        system_prompt=make_mmlu_system_prompt()
-    )
-    gpqa_worker_profile = RequestParams(
-        base_url=BASE_URL,
-        api_key=API_KEY,
-        model=MODEL,
-        max_tokens=128,
-        system_prompt=make_gpqa_system_prompt(),
-        prompt_suffix=make_gpqa_suffix()
+        max_tokens=2048,
+        system_prompt=make_system_prompt()
     )
     ifeval_worker_profile = RequestParams(
         base_url=BASE_URL,
@@ -89,26 +66,19 @@ async def main():
         base_url=BASE_URL,
         api_key=API_KEY,
         model=MODEL,
-        max_tokens=128,
-        system_prompt=make_mmlu_pro_system_prompt()
+        max_tokens=2048,
+        system_prompt=make_system_prompt()
     )
-    # Using cot in supergpqa evaluation. Use the following non-cot prompt as you need (which is aligned to mmlu settings)
-    def temp_system_prompt() -> str:
-        return f"You are a professional exam question verifier. Answer the given Multiple Choice Question with your expertise in the corresponding domain. Present ONLY the correct option letter without any additional content."
     supergpqa_worker_profile = RequestParams(
         base_url=BASE_URL,
         api_key=API_KEY,
         model=MODEL,
         max_tokens=2048,
-        system_prompt=make_supergpqa_system_prompt(),
-        prompt_suffix=make_supergpqa_suffix()
+        system_prompt=make_system_prompt()
     )
     
     ifeval_worker = Worker(ifeval_worker_profile)
-    ceval_worker = Worker(ceval_val_worker_profile)
     cmmlu_worker = Worker(cmmlu_worker_profile)
-    mmlu_worker = Worker(mmlu_worker_profile)
-    gpqa_worker = Worker(gpqa_worker_profile)
     mmlu_pro_worker = Worker(mmlu_pro_worker_profile)
     humaneval_worker = Worker(humaneval_worker_profile)
     supergpqa_worker = Worker(supergpqa_worker_profile)
@@ -116,14 +86,11 @@ async def main():
     # 
     # Start evaluation
     # 
-    await conduct_humaneval(HUMANEVAL_PATH, humaneval_worker)
-    await conduct_gpqa(GPQA_DIR, gpqa_worker)
-    await conduct_ifeval(IFEVAL_PATH, ifeval_worker)
-    await conduct_ceval_val(CEVAL_DIR, ceval_worker)
-    await conduct_cmmlu(CMMLU_DIR, cmmlu_worker)
-    await conduct_mmlu(MMLU_DIR, mmlu_worker)
-    await conduct_mmlu_pro(MMLU_PRO_PATH, mmlu_pro_worker)
-    await conduct_supergpqa(SUPERGPQA_PATH, supergpqa_worker)
+    await conduct_humaneval(HUMANEVAL_PATH, humaneval_worker, test_mode=False)
+    await conduct_ifeval(IFEVAL_PATH, ifeval_worker, test_mode=False)
+    await conduct_cmmlu(CMMLU_DIR, cmmlu_worker, test_mode=True, subset_max_size=0, response_preprocessor=mcq_search_preprocessor)
+    await conduct_mmlu_pro(MMLU_PRO_PATH, mmlu_pro_worker, test_mode=True, subset_max_size=0, response_preprocessor=mcq_search_preprocessor)
+    await conduct_supergpqa(SUPERGPQA_PATH, supergpqa_worker, test_mode=True, subset_max_size=0, response_preprocessor=mcq_search_preprocessor)
 
     # Demo: Organize eval tasks for multiple models/datasets
     # 

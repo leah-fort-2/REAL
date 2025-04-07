@@ -52,7 +52,7 @@ async def main():
         base_url=BASE_URL,
         api_key=API_KEY,
         model=MODEL,
-        max_tokens=2048
+        max_tokens=4096
     )
     humaneval_worker_profile = RequestParams(
         base_url=BASE_URL,

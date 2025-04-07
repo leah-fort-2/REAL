@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # IfEval does not need response preprocessing (use as_is) unless you are evaluating reasoning models.
-RESPONSE_PREPROCESSOR=remove_think_tags
+RESPONSE_PREPROCESSOR=as_is
 
 async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
     """

@@ -217,7 +217,7 @@ Many of these external modules use file I/O to retrieve/export evaluation proces
 | cmmlu | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |2048|STRICT_MATCH|
 | mmlu | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
 | gpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
-| ifeval | 0.0 |  | | |2048|ifeval_judge_strict|
+| ifeval | 0.0 |  | | |4096|ifeval_judge_strict|
 | mmlu_pro | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
 | humaneval | 0.0 | You are a coder. Complete the following code block according to the docstring with proper indentation. Provide ONLY the completion without additional content.\n | | \# YOUR COMPLETION STARTS HERE\n |512|humaneval_eval_raw_pass|
 | supergpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | | 2048 | STRICT_MATCH|

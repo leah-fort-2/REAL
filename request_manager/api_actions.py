@@ -1,6 +1,7 @@
 # Configure logging
 import logging
 import asyncio
+from typing import Tuple
 from aiohttp import ClientTimeout
 from aiohttp import ClientTimeout, ClientError
 import dotenv
@@ -141,6 +142,38 @@ def extract_content(OAI_response):
         logger.error(f"Failed to extract content from API response: {OAI_response}")
         return ''
     
+def extract_usage(OAI_response) -> Tuple[str, int, int]:
+    """
+    :params OAI_response: response dict from an OpenAI compatible API. Should be structured as:
+    ```{'choices': [
+            {'message': 
+                {'content': str}
+            }],
+        'usage': 
+            {
+                'prompt_tokens': int,
+                'completion_tokens': int
+            }
+        }
+    """
+    try:
+        msg = OAI_response['choices'][0]['message']['content']
+    except (TypeError, KeyError, IndexError):
+        logger.error(f"Failed to extract content from API response: {OAI_response}")
+        msg = ''
+    try:
+        prompt_tokens = OAI_response['usage']['prompt_tokens']
+    except (TypeError, KeyError, IndexError):
+        logger.error(f"Failed to extract prompt token usage from API response: {OAI_response}")
+        prompt_tokens = 0
+    try:
+        completion_tokens = OAI_response['usage']['completion_tokens']
+    except (TypeError, KeyError, IndexError):
+        logger.error(f"Failed to extract completion token usage from API response: {OAI_response}")
+        completion_tokens = 0
+
+    return (msg, prompt_tokens, completion_tokens)
+
 def extract_content_with_reasoning(o1_response):
     """
     :params o1_response: response dict from an OAI API with `reasoning_content` output. Should be structured as:

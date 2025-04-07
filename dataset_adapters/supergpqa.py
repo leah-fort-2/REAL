@@ -107,7 +107,8 @@ async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_p
     def log():
         params = {
             "test_set_type": "mcq",
-            "judging_method": response_preprocessor.__name__
+            "judging_method": response_preprocessor.__name__,
+            "subset_max_size": subset_max_size
         }
         eval_dir = craft_eval_dir_path(results_dir, DATASET_NAME, MODEL)
         log_resultfile(DATASET_NAME, worker, eval_dir, params=params)

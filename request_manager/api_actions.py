@@ -99,29 +99,48 @@ def make_request_body(request_str, **request_params):
     :params request_str:  a single request string sent to API
     :params request_params: Request parameters in body e.g. temperature
     """
-    MODEL = request_params["model"]
-    params = {"model": MODEL}
+    params = {}
+    try:
+        MODEL = request_params.pop("model")
+    except KeyError:
+        raise KeyError(f"No model information is found in request params. Params content: {request_params}")
+    params.update({"model": MODEL})
+    # By this moment, model should no more exist in request_params
+    
     float_params = ["temperature", "top_p", "frequency_penalty", "presence_penalty"]
-    int_params = ["max_tokens"]
+    int_params = ["max_tokens", "top_k"]
 
-    if "temperature" in request_params and "top_p" in request_params:
-        logger.info(f"Detect temperature {request_params['temperature']} and top_p {request_params['top_p']}. top_p is ignored. To use top_p sampling, set temperature as blank or specify it as None in request_params.")
+    key_updated = {}
+    for key in float_params:
+        if key in request_params:
+            key_updated[key] = float(request_params.pop(key))
+    for key in int_params:
+        if key in request_params:
+            key_updated[key] = int(request_params.pop(key))
+    params.update(key_updated)
+    # By this moment, float_params and int_params should no more exist in request_params
+    
+    if ("top_p" in params or "top_k" in params) and "temperature" in params and params["temperature"]==0:
+        logger.info(f"Detect temperature {params['temperature']} and top_p {params.get('top_p', None)} / top_k {params.get('top_k', None)}. In case of 0 temperature, top_p and top_k will be ignored. To use nucleus sampling, set temperature as a non-zero value.")
         params.pop("top_p", None)
+        params.pop("top_k", None)
     
-    params.update({key: float(request_params[key]) for key in float_params if key in request_params})
-    params.update({key: int(request_params[key]) for key in int_params if key in request_params})
-    
-    prefix = request_params.get("prompt_prefix", "")
-    suffix = request_params.get("prompt_suffix", "")
-    system_prompt = request_params.get("system_prompt", "")
+    prefix = request_params.pop("prompt_prefix", "")
+    suffix = request_params.pop("prompt_suffix", "")
+    system_prompt = request_params.pop("system_prompt", "")
     messages=[]
     if system_prompt != "":
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": f"{prefix}{request_str}{suffix}"})
+    # By this moment, prefix, suffix and system prompt should no more exist in request_params
+
     request = {"messages": messages}
     for key, value in params.items():
         request[key] = value
         
+    # Add remaining request_params
+    for key, value in request_params.items():
+        request[key] = value
     # Patch in 2.1.2: Forbid stream output
     request.update({"stream": False})
     
@@ -155,6 +174,8 @@ def extract_usage(OAI_response) -> Tuple[str, int, int]:
                 'completion_tokens': int
             }
         }
+    ```
+    :returns: Tuple[message, prompt_tokens, completion_tokens]
     """
     try:
         msg = OAI_response['choices'][0]['message']['content']

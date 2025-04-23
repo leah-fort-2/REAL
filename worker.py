@@ -13,6 +13,7 @@ DEFAULT_API_KEY = os.getenv("API_KEY")
 DEFAULT_MODEL = os.getenv("MODEL")
 DEFAULT_TEMPERATURE = float(os.getenv("TEMPERATURE")) if os.getenv("TEMPERATURE") else None
 DEFAULT_TOP_P = float(os.getenv("TOP_P"))  if os.getenv("TOP_P") else None
+DEFAULT_TOP_K = int(os.getenv("TOP_K")) if os.getenv("TOP_K") else None
 DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS"))  if os.getenv("MAX_TOKENS") else None
 DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))  if os.getenv("FREQUENCY_PENALTY") else None
 DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))  if os.getenv("PRESENCE_PENALTY") else None
@@ -47,6 +48,7 @@ class RequestParams:
         'model': str,
         'temperature': Union[float, int],
         'top_p': Union[float, int],
+        'top_k': int,
         'max_tokens': int,
         'frequency_penalty': Union[float, int],
         'presence_penalty': Union[float, int],
@@ -65,6 +67,7 @@ class RequestParams:
         self.model = self._validate_type('model', kwargs.get('model', DEFAULT_MODEL))
         self.temperature = self._validate_type('temperature', kwargs.get('temperature', DEFAULT_TEMPERATURE))
         self.top_p = self._validate_type('top_p', kwargs.get('top_p', DEFAULT_TOP_P))
+        self.top_k = self._validate_type('top_k', kwargs.get('top_k', DEFAULT_TOP_K))
         self.max_tokens = self._validate_type('max_tokens', kwargs.get('max_tokens', DEFAULT_MAX_TOKENS))
         self.frequency_penalty = self._validate_type('frequency_penalty', kwargs.get('frequency_penalty', DEFAULT_FREQUENCY_PENALTY))
         self.presence_penalty = self._validate_type('presence_penalty', kwargs.get('presence_penalty', DEFAULT_PRESENCE_PENALTY))

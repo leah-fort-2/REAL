@@ -20,3 +20,4 @@ results/custom_tests/*
 !results/custom_tests/CUSTOM_TEST_RESULTS_HERE
 test_*
 test/
+.vscode

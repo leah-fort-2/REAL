@@ -50,6 +50,7 @@ def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
         'quantization_bits': 'null',
         'temperature': 'null',
         'top_p': 'null',
+        'top_k': 'null',
         'max_tokens': 'null',
         'frequency_penalty': 'null',
         'presence_penalty': 'null',
@@ -58,7 +59,8 @@ def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
         'prompt_suffix': '',
         'test_set_name': dataset_name,
         'test_set_type': 'mcq',
-        'judging_method': 'null'
+        'judging_method': 'null',
+        'subset_max_size': 'null'
     }
     
     # Update default values with provided parameter values
@@ -75,6 +77,7 @@ quantization_bits: {final_values['quantization_bits']}
 # model settings
 temperature: {final_values['temperature']}
 top_p: {final_values['top_p']}
+top_k: {final_values['top_k']}
 max_tokens: {final_values['max_tokens']}
 frequency_penalty: {final_values['frequency_penalty']}
 presence_penalty: {final_values['presence_penalty']}
@@ -87,7 +90,8 @@ prompt_suffix: "{escape(final_values['prompt_suffix'])}"
 # score judging specifics
 test_set_name: {final_values['test_set_name']}
 test_set_type: {final_values['test_set_type']}
-judging_method: {final_values['judging_method']}"""
+judging_method: {final_values['judging_method']}
+subset_max_size: {final_values['subset_max_size']}"""
     
     resultfile_path = f"{log_dir}/RESULTFILE"
     

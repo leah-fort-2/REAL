@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 THINK_FAILED_MSG = "Thinking process failed."
 ANSWER_FAILED_MSG = "No valid answer field was found. Fall back to false."
+from request_manager.api_actions import NONE_CONTENT_ERROR_MSG
 
 def as_is(response: str):
     """
@@ -23,8 +24,10 @@ def as_is(response: str):
 
 def mcq_search_preprocessor(response: str):
     """
-    mcq preprocessor that works with <answer> </answer> tags.
-    On failure to extract answer tags, fall back to an error msg that results in 0 point.
+    mcq preprocessor that works with \<answer> \</answer> tags.
+    
+    - :None response content: NONE_CONTENT_ERROR_MSG ('Received None content.')
+    - :Malformed answer (No valid \<answer\> field): ANSWER_FAILED_MSG ("No valid answer field was found. Fall back to false.")
     """
     def _extract_answer(s: str):
         # Remove latex boxed statement e.g. `\boxed{A}`
@@ -47,8 +50,9 @@ def mcq_preprocessor(response: str):
     
     An independent letter has no adjacent alphanumeric characters. A well-formated MCQ response starts with and only contains a letter. Considering formatting, at least the first/last alphabetical character should be independent (`**A**` is possible).
     
-    e.g. ` A. answer` => `A`
-    `Unknown error in connection` => ""
+    - :None response content: NONE_CONTENT_ERROR_MSG ('Received None content.')
+    - :Unrecognizable independent letters: ""
+    - :Others: ` A. answer` => `A`
     """
     
     def _handle_both_ends(s: str):
@@ -63,40 +67,30 @@ def mcq_cot_preprocessor(response: str):
     """
     Similar to a regular mcq preprocessor, but add cot truncation and bad cot handling.
     
+    - :None response content: NONE_CONTENT_ERROR_MSG ('Received None content.')
     - :Incomplete cot: THINK_FAILED_MSG (`Thinking process failed.`)
-    - :Valid cot but Empty conclusion: ""
+    - :Valid cot but Empty conclusion: THINK_FAILED_MSG
     - :Otherwise: as in mcq_preprocessor
     """
     def _handle_both_ends(s: str):
         first_independent_letter = pick_first_letter_if_independent(s)
         return first_independent_letter if first_independent_letter else pick_last_letter_if_independent(s)
     
-    def _catch_bad_cot_pipeline(s: str):
-        # On bad cot, immediately return fallback message. Otherwise same as in mcq_preprocessor
-        if s == THINK_FAILED_MSG:
-            # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
-            return THINK_FAILED_MSG
-        return preprocess_pipeline(s, 
-                                   _handle_both_ends,
-                                   lambda s: s.upper())
-    
     return preprocess_pipeline(response, 
                                remove_think_tags, 
-                               _catch_bad_cot_pipeline)
+                               _handle_both_ends,
+                               lambda s: s.upper())
     
 def mcq_cot_preprocessor_for_bad_if(response:str):
     """
-    Similar to mcq_cot_preprocessor, but pick the last letter instead. Applies to models with bad instruction following (stubborn in giving analysis).
+    Similar to mcq_cot_preprocessor, but cherrypick the last letter instead. Applies to models with bad instruction following (stubborn in giving analysis).
     
+    - :None response content: NONE_CONTENT_ERROR_MSG ('Received None content.')
     - :Incomplete cot: THINK_FAILED_MSG ("Thinking process failed.")
-    
-    - :Regular: The last alphabetical character uppercased `The correct answer is: A.` => `A`
-    
+    - :Valid cot but Empty conclusion: THINK_FAILED_MSG
     - :Multiple answers (among ABCD) were given: `A, B, C` => [removed]
-    
+    - :Regular: The last alphabetical character uppercased `The correct answer is: A.` => `A`
     - :No match: ""
-    
-    - :Valid cot but Empty conclusion: ""
     """
     
     def remove_multiple_choices(s: str):
@@ -109,17 +103,13 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
         """
         These conditional makes the component methods not individually chainable to pipeline:
         
-        - :THINK_FAILED_MSG input: immediately return the flag
+        - :ERROR MSG flags input: immediately return the flag
         
         - :letter selection with fallbacks:
         
         - search_for_answer decision upon no independent letter is found from both ends 
 
         """
-        if s == THINK_FAILED_MSG:
-            # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
-            return THINK_FAILED_MSG
-        
         state = pick_last_letter_if_independent(s)
         # e.g.  "Answer: B" -> "B" 
         
@@ -145,10 +135,6 @@ def clean_humaneval_cot_preprocessor(response: str) -> str:
     Equivalent of clean_humaneval_preprocessor, but for models supporting cot, as deepseek r1 distill models.
     """
     def _catch_bad_cot_and_clean(s: str) -> str:
-        if s == THINK_FAILED_MSG:
-            # remove_think_tags will return "" when cot process is not completed or the model outputs nothing as the result
-            return THINK_FAILED_MSG
-        
         return s.strip("`").lstrip("python")
     
     return preprocess_pipeline(response,
@@ -164,7 +150,8 @@ def model_binary_scoring_cot_preprocessor(response: str) -> str:
     # Parse a scoring model message into a binary int score.
     def _catch_bad_cot_pipeline(s: str):
         # Requires remove_think_tags first
-        if s == THINK_FAILED_MSG:
+        s = remove_think_tags(s)
+        if s in (THINK_FAILED_MSG, NONE_CONTENT_ERROR_MSG):
             return "" # In scoring, no need to return flag
         
         state = pick_first_numbers_if_independent(s)
@@ -176,7 +163,6 @@ def model_binary_scoring_cot_preprocessor(response: str) -> str:
         return state
     
     return preprocess_pipeline(response, 
-                               remove_think_tags,
                                _catch_bad_cot_pipeline)
 
 def model_binary_scoring_preprocessor(response: str) -> str:
@@ -325,7 +311,9 @@ def pick_last_numbers_if_independent(s: str) -> str:
             return match.group(2).replace(",","")
     return ""
 
+@DeprecationWarning
 def search_for_answer(s: str):
+    # Deprecated.
     # Remove latex boxed statement e.g. `\boxed{A}`
     unboxed = s.replace("\\boxed", " ")
     
@@ -358,6 +346,9 @@ def remove_think_tags(s: str):
     if len(removed) == len(s):
         logger.warning(f"Encountered malformed cot section. The cot is likely incomplete. Will fall back to think failed msg.")
         return THINK_FAILED_MSG
+    if len(removed.strip()) == 0:
+        logger.warning("Despite cot being complete, no answer was made. Will fall back to think failed msg.")
+        return THINK_FAILED_MSG
     return removed.lstrip("\n")
 
 def filter_bad_option_letters(s: str):
@@ -383,6 +374,8 @@ def preprocess_pipeline(str_to_preprocess: str, *preprocessors):
     """
     state = str_to_preprocess
     for func in preprocessors:
+        if state in (THINK_FAILED_MSG, ANSWER_FAILED_MSG, NONE_CONTENT_ERROR_MSG):
+            return state
         if state != "":
             state = func(state)
             continue

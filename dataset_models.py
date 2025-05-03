@@ -440,12 +440,12 @@ class ResponseSet:
             # Skip questions with empty answer/response.
             if preprocessed_answer == "":
                 # No valid answer field. Skip the question.
-                logger.error(f"Parsed invalid answer field. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Unrecognizable answer. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 return True
             
             if preprocessed_response == "":
                 # No valid response field to judge. Skip the question.
-                logger.error(f"Parsed invalid response field. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
+                logger.error(f"Unrecognizable response. Skipped. Response: {resp_obj[response_key][:50]}... ; Answer: {resp_obj[answer_key][:50]}...")
                 return True
         
         # Tuple[score, full_score] for score changes. (0, -1) for skipped; (score, 0) for not skipped

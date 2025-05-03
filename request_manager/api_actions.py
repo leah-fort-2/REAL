@@ -134,6 +134,11 @@ def make_request_body(request_str, **request_params):
     messages.append({"role": "user", "content": f"{prefix}{request_str}{suffix}"})
     # By this moment, prefix, suffix and system prompt should no more exist in request_params
 
+    request_params.pop("base_url")
+    request_params.pop("api_url")
+    request_params.pop("api_key")
+    # Shouldn't be present in actual request
+
     request = {"messages": messages}
     for key, value in params.items():
         request[key] = value
@@ -146,6 +151,8 @@ def make_request_body(request_str, **request_params):
     
     return request
 
+NONE_CONTENT_ERROR_MSG = "Received None content."
+
 def extract_content(OAI_response):
     """
     :params OAI_response: response dict from an OpenAI compatible API. Should be structured as:
@@ -156,12 +163,17 @@ def extract_content(OAI_response):
         }
     """
     try:
-        return OAI_response['choices'][0]['message']['content']
+        msg = OAI_response['choices'][0]['message']['content']
+        if msg is None:
+            raise ValueError
     except (TypeError, KeyError, IndexError):
         logger.error(f"Failed to extract content from API response: {OAI_response}")
-        return ''
+        msg = ''
+    except ValueError:
+        msg = NONE_CONTENT_ERROR_MSG
+    return msg
     
-def extract_usage(OAI_response) -> Tuple[str, int, int]:
+def extract_usage(OAI_response) -> Tuple[str | None, int, int]:
     """
     :params OAI_response: response dict from an OpenAI compatible API. Should be structured as:
     ```{'choices': [
@@ -178,10 +190,14 @@ def extract_usage(OAI_response) -> Tuple[str, int, int]:
     :returns: Tuple[message, prompt_tokens, completion_tokens]
     """
     try:
-        msg = OAI_response['choices'][0]['message']['content']
+        msg: str | None = OAI_response['choices'][0]['message']['content']
+        if msg is None:
+            raise ValueError
     except (TypeError, KeyError, IndexError):
         logger.error(f"Failed to extract content from API response: {OAI_response}")
         msg = ''
+    except ValueError:
+        msg = NONE_CONTENT_ERROR_MSG
     try:
         prompt_tokens = OAI_response['usage']['prompt_tokens']
     except (TypeError, KeyError, IndexError):

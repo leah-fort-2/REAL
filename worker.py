@@ -17,6 +17,7 @@ DEFAULT_TOP_K = int(os.getenv("TOP_K")) if os.getenv("TOP_K") else None
 DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS"))  if os.getenv("MAX_TOKENS") else None
 DEFAULT_FREQUENCY_PENALTY = float(os.getenv("FREQUENCY_PENALTY"))  if os.getenv("FREQUENCY_PENALTY") else None
 DEFAULT_PRESENCE_PENALTY = float(os.getenv("PRESENCE_PENALTY"))  if os.getenv("PRESENCE_PENALTY") else None
+DEFAULT_REPETITION_PENALTY = float(os.getenv("REPETITION_PENALTY"))  if os.getenv("REPETITION_PENALTY") else None
 # When system prompt is left blank or None, no system message will be added to the session.
 DEFAULT_SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT")
 DEFAULT_PROMPT_PREFIX = os.getenv("PROMPT_PREFIX")
@@ -52,6 +53,7 @@ class RequestParams:
         'max_tokens': int,
         'frequency_penalty': Union[float, int],
         'presence_penalty': Union[float, int],
+        "repetition_penalty": Union[float, int],
         'api_url': str
     }
 
@@ -71,6 +73,7 @@ class RequestParams:
         self.max_tokens = self._validate_type('max_tokens', kwargs.get('max_tokens', DEFAULT_MAX_TOKENS))
         self.frequency_penalty = self._validate_type('frequency_penalty', kwargs.get('frequency_penalty', DEFAULT_FREQUENCY_PENALTY))
         self.presence_penalty = self._validate_type('presence_penalty', kwargs.get('presence_penalty', DEFAULT_PRESENCE_PENALTY))
+        self.repetition_penalty = self._validate_type('repetition_penalty', kwargs.get('repetition_penalty', DEFAULT_REPETITION_PENALTY))
         
         self.api_url = self._validate_type('api_url', f"{self.base_url}/chat/completions")
         

@@ -9,6 +9,9 @@ Initialize a RESULTFILE with (default field values):
 # model settings
 - temperature: (worker's parameter)
 - top_p: (worker's parameter)
+- top_k: (worker's parameter)
+- frequency_penalty: (worker's parameter)
+- presence_penalty: (worker's parameter)
 - repetition_penalty: (worker's parameter)
 
 # prompt settings
@@ -17,9 +20,12 @@ Initialize a RESULTFILE with (default field values):
 - prompt_suffix: (worker's parameter)
 
 # score judging specifics
-- test_set_name: (null)
-- test_set_type: (null)
-- judging_method: (null)
+- test_set_name: (set in adapter)
+- test_set_type: (set in adapter)
+- judging_method: (set in adapter)
+
+# other parameters
+- *remaining parameters
 """
 
 import os
@@ -44,54 +50,47 @@ def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
     # Default values
     default_values = {
         'date': datetime.now().strftime('%m-%d-%Y'),
-        'model': 'local-model',
-        'backend': 'null',
-        'quantized': 'null',
-        'quantization_bits': 'null',
-        'temperature': 'null',
-        'top_p': 'null',
-        'top_k': 'null',
-        'max_tokens': 'null',
-        'frequency_penalty': 'null',
-        'presence_penalty': 'null',
-        'system_prompt': '',
-        'prompt_prefix': '',
-        'prompt_suffix': '',
         'test_set_name': dataset_name,
         'test_set_type': 'mcq',
-        'judging_method': 'null',
-        'subset_max_size': 'null'
     }
     
     # Update default values with provided parameter values
     values = worker.get_params()
     final_values = {**default_values, **values, **params}
+    final_values.pop("api_key", None)
         
     # Create the RESULTFILE content
-    resultfile_content = f"""date: {final_values['date']}
-model: {final_values['model']}
-backend: {final_values['backend']}
-quantized: {final_values['quantized']}
-quantization_bits: {final_values['quantization_bits']}
+    resultfile_content = f"""date: {final_values.pop('date', "null")}
+model: {final_values.pop('model', 'local-model')}
+backend: {final_values.pop('backend', "null")}
+quantized: {final_values.pop('quantized', "null")}
+quantization_bits: {final_values.pop('quantization_bits', "null")}
 
 # model settings
-temperature: {final_values['temperature']}
-top_p: {final_values['top_p']}
-top_k: {final_values['top_k']}
-max_tokens: {final_values['max_tokens']}
-frequency_penalty: {final_values['frequency_penalty']}
-presence_penalty: {final_values['presence_penalty']}
+temperature: {final_values.pop('temperature', "null")}
+top_p: {final_values.pop('top_p', "null")}
+top_k: {final_values.pop('top_k', "null")}
+max_tokens: {final_values.pop('max_tokens', "null")}
+frequency_penalty: {final_values.pop('frequency_penalty', "null")}
+presence_penalty: {final_values.pop('presence_penalty', "null")}
+repetition_penalty: {final_values.pop('repetition_penalty', "null")}
 
 # prompt settings
-system_prompt: "{escape(final_values['system_prompt'])}"
-prompt_prefix: "{escape(final_values['prompt_prefix'])}"
-prompt_suffix: "{escape(final_values['prompt_suffix'])}"
+system_prompt: "{escape(final_values.pop('system_prompt', 'null'))}"
+prompt_prefix: "{escape(final_values.pop('prompt_prefix', 'null'))}"
+prompt_suffix: "{escape(final_values.pop('prompt_suffix', 'null'))}"
 
 # score judging specifics
-test_set_name: {final_values['test_set_name']}
-test_set_type: {final_values['test_set_type']}
-judging_method: {final_values['judging_method']}
-subset_max_size: {final_values['subset_max_size']}"""
+test_set_name: {final_values.pop('test_set_name', "null")}
+test_set_type: {final_values.pop('test_set_type', "null")}
+judging_method: {final_values.pop('judging_method', "null")}
+subset_max_size: {final_values.pop('subset_max_size', 'null')}
+
+# other parameters
+{"\n".join([
+    f"{key}: {escape(str(val))}" for key, val in final_values.items()
+    ])}
+"""
     
     resultfile_path = f"{log_dir}/RESULTFILE"
     

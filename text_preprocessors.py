@@ -24,7 +24,7 @@ def as_is(response: str):
 
 def mcq_search_preprocessor(response: str):
     """
-    mcq preprocessor that works with \<answer> \</answer> tags.
+    mcq preprocessor that works with \<answer\> \</answer\> tags.
     
     - :None response content: NONE_CONTENT_ERROR_MSG ('Received None content.')
     - :Malformed answer (No valid \<answer\> field): ANSWER_FAILED_MSG ("No valid answer field was found. Fall back to false.")
@@ -34,7 +34,7 @@ def mcq_search_preprocessor(response: str):
         unboxed = s.replace("\\boxed", " ")
 
         pattern = f"<[Aa]nswer>([^\\w]*?)([A-Za-z]+).*</[Aa]nswer>"
-        match = re.search(pattern, unboxed, re.DOTALL)
+        match = re.search(pattern, unboxed, flags=re.DOTALL)
         if match != None:
             # Only pick if the first letter of the group is independent. e.g. `Answer: A` but not `Answer: Shark` 
             state = pick_first_letter_if_independent(match.group(2))
@@ -123,7 +123,7 @@ def mcq_cot_preprocessor_for_bad_if(response:str):
                                remove_multiple_choices,
                                remove_think_tags,
                                _catch_bad_cot_pipeline)
-    
+
 def clean_humaneval_preprocessor(response: str) -> str:
     """
     Deals with code completion with surrounding code block syntax(```python ```)

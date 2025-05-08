@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 JUDGER=STRICT_MATCH
 
-async def conduct_ceval_val(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", shuffled=False, test_mode=False, enable_metrics=False):
+async def conduct_ceval_val(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", shuffled=False, subset_max_size=0, test_mode=False, enable_metrics=False):
     """
     Conduct a ceval test on it's val subset. Before evaluation, create a worker instance.
     
@@ -29,7 +29,9 @@ async def conduct_ceval_val(dataset_dir: str, worker: Worker, response_preproces
     :params Callable[[str], str] response_preprocessor: Preprocess model responses before they go to the court. Select on your need.
     :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
     :params shuffled: Each query evaluates with shuffled options. 
-    :params test_mode: only first 10 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params int subset_max_size: 0 (default) = eval all entries; 50 = the first 50 entries of each subfield, etc.
+    :params test_mode: only first 3 queries from first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     DATASET_NAME = "ceval_val"
     MODEL = worker.get_params()["model"]
@@ -79,9 +81,12 @@ async def conduct_ceval_val(dataset_dir: str, worker: Worker, response_preproces
         
     for raw_dataset in datasets:
         # The original ceval test set contains 5 mcq fields. Need to merge them into one.
-        # Test mode: Only the first 10 queries will be evaluated.
+        # Test mode: Only the first 3 queries will be evaluated.
         if test_mode:
-            raw_dataset = raw_dataset[:10]
+            raw_dataset = raw_dataset[:3]
+        else:
+            if subset_max_size > 0:
+                raw_dataset = raw_dataset[:subset_max_size]
         # Keys are merged into a question field, overwriting the existing field
         dataset = raw_dataset.merge_keys([QUERY_KEY, "A", "B", "C", "D"], "question")
         
@@ -99,7 +104,8 @@ async def conduct_ceval_val(dataset_dir: str, worker: Worker, response_preproces
     def log():
         params = {
             "test_set_type": "mcq",
-            "judging_method": response_preprocessor.__name__
+            "judging_method": response_preprocessor.__name__,
+            "subset_max_size": subset_max_size
         }
         eval_dir = craft_eval_dir_path(results_dir, DATASET_NAME, MODEL)
         log_resultfile(DATASET_NAME, worker, eval_dir, params=params)

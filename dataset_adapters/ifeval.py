@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # IfEval does not need response preprocessing (use as_is) unless you are evaluating reasoning models.
-RESPONSE_PREPROCESSOR=remove_think_tags
+RESPONSE_PREPROCESSOR=as_is
 
 async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False, enable_metrics=False):
     """
@@ -21,7 +21,8 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
     :params worker: The industrious worker.
     :params str results_dir: Store result file in this directory. Default to: results
     :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
-    :params bool test_mode: only the first 10 questions will be evaluated. Only for debug purposes.
+    :params bool test_mode: only the first 3 questions will be evaluated. Only for debug purposes.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     # ifeval specific settings, do not modify
     QUERY_KEY = "prompt"
@@ -42,7 +43,7 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
     query_set = QuerySet(ifeval_src_file_path)
     
     if test_mode:
-        query_set = query_set[:10]
+        query_set = query_set[:3]
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
         

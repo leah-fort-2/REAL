@@ -100,7 +100,7 @@ dataset_path = "path/to/mmlu/dataset"
 worker_profile = RequestParams(
   model="deepseek-chat",
   temperature=0,
-  max_tokens=2048,
+  max_tokens=8192,
   frequency_penalty=0
   system_prompt="You are a helpful assistant."
 )
@@ -108,7 +108,7 @@ worker_profile = RequestParams(
 industrious_worker = Worker(worker_profile)
 
 # Call an adapter
-await conduct_mmlu(dataset_path, worker, response_preprocessor = mcq_search_preprocessor, max_subset_size = 50)
+conduct_mmlu(dataset_path, industrious_worker, test_mode=False, subset_max_size=50, response_preprocessor=mcq_search_preprocessor, enable_metrics=True)
 ```
 
 ## Workflow Orchestration in Adapters
@@ -213,11 +213,11 @@ Many of these external modules use file I/O to retrieve/export evaluation proces
 
 | Eval Name | Temperature | System Prompt | Prompt Prefix | Prompt Suffix | Max Tokens | Judge |
 | --- | --- | --- | --- | --- | --- | --- |
-| ceval | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |2048|STRICT_MATCH|
-| cmmlu | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |2048|STRICT_MATCH|
-| mmlu | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
-| gpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
-| ifeval | 0.0 |  | | |4096|ifeval_judge_strict|
-| mmlu_pro | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |2048|STRICT_MATCH|
-| humaneval | 0.0 | You are a coder. Complete the following code block according to the docstring with proper indentation. Provide ONLY the completion without additional content.\n | | \# YOUR COMPLETION STARTS HERE\n |512|humaneval_eval_raw_pass|
-| supergpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | | 2048 | STRICT_MATCH|
+| ceval | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |4096|STRICT_MATCH|
+| cmmlu | 0.0 | 请回答一道单项选择题（有唯一正确答案），并在<answer>和</answer>之间输出正确的选项字母。 | | |4096|STRICT_MATCH|
+| mmlu | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |4096|STRICT_MATCH|
+| gpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |4096|STRICT_MATCH|
+| ifeval | 0.0 |  | | |8192|ifeval_judge_strict|
+| mmlu_pro | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | |4096|STRICT_MATCH|
+| humaneval | 0.0 | You are a coder. Complete the following code block according to the docstring with proper indentation. Provide ONLY the completion without additional content.\n | | \# YOUR COMPLETION STARTS HERE\n |4096|humaneval_eval_raw_pass|
+| supergpqa | 0.0 | Answer the MCQ (only one option is correct). In your response, present the correct option letter between <answer> and </answer>. | | | 4096 | STRICT_MATCH|

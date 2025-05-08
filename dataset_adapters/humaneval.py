@@ -20,7 +20,8 @@ async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_di
     :params humaneval_file_path: The humaneval test file path.
     :params worker: The industrious worker.
     :params str results_dir: Store result file in this directory. Default to: results
-    :params bool test_mode: only the first 10 questions are tested. Only for debug purposes.
+    :params bool test_mode: only the first 3 questions are tested. Only for debug purposes.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     # humaneval specific settings, do not modify
     QUERY_KEY = "prompt"
@@ -36,7 +37,7 @@ async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_di
     query_set = QuerySet(humaneval_file_path)
     
     if test_mode:
-        query_set = query_set[:10]
+        query_set = query_set[:3]
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
         

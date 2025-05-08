@@ -23,8 +23,9 @@ async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_pre
     :params Callable[[str], str] response_preprocessor: Preprocess model responses before they go to the court. Select on your need.
     :params str results_dir: In which directory to store the responses + evaluation results. Default to "results" => "results/mmlu_pro/athene-v2-chat/test-athene-v2-chat-mmlu_pro.xlsx"
     :params str score_output_path: Where to store the evaluation summary. Default to "model_results.xlsx"
-    :params bool test_mode: If enabled, only the first 10 queries will be evaluated. For debug purposes. Default to False.
+    :params bool test_mode: If enabled, only the first 3 subsets (in alphabetical order) will be tested. Output files will be placed under test/ directory. For debug purposes. Default to False.
     :params int subset_max_size: 0 (default) = eval all entries; 50 = the first 50 entries of each category, etc.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     DATASET_NAME = "mmlu_pro"
     MODEL = worker.get_params()["model"]
@@ -56,6 +57,10 @@ async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_pre
             {category: subset[:subset_max_size]}
             )
          for category, subset in query_sets_by_categories.items()]
+        
+    category_query_set_pairs_sorted_in_alphabetical_order = sorted(list(query_sets_by_categories.items()), key=lambda tup: tup[0])
+    if test_mode:
+        category_query_set_pairs_sorted_in_alphabetical_order = category_query_set_pairs_sorted_in_alphabetical_order[:3]
     
     async def task(category: str, query_set: QuerySet):
         """
@@ -99,7 +104,7 @@ async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_pre
         ResponseSet([score_summary]).store_to(score_output_path)
     
     tasks = []
-    for category, query_set in query_sets_by_categories.items():
+    for category, query_set in category_query_set_pairs_sorted_in_alphabetical_order:
         tasks.append(task(category, query_set))
 
     for completed_task in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc=f"{DATASET_NAME}: Task Completion Progress", position=0):

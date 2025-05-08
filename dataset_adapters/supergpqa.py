@@ -25,7 +25,8 @@ async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_p
     :params str results_dir: In which directory to store the responses + evaluation results. Default to "results" => "results/supergpqa/athene-v2-chat/test-athene-v2-chat-supergpqa.xlsx"
     :params str score_output_path: Where to store the evaluation summary. Default to "model_results.xlsx"
     :params int subset_max_size: 0 (default) = eval all entries; 50 = the first 50 entries of each category, etc.
-    :params bool test_mode: If enabled, only the first 10 queries will be evaluated. For debug purposes. Default to False.
+    :params bool test_mode: If enabled, only the first 3 subsets (in alphabetical order) will be tested. Output files will be placed under test/ directory. For debug purposes. Default to False.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     DATASET_NAME = "supergpqa"
     MODEL = worker.get_params()["model"]
@@ -60,6 +61,10 @@ async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_p
             {identifier: subset[:subset_max_size]}
             )
          for identifier, subset in query_sets_by_identifiers.items()]
+        
+    id_query_set_pairs_sorted_in_alphabetical_order = sorted(list(query_sets_by_identifiers.items()), key=lambda tup: tup[0])
+    if test_mode:
+        id_query_set_pairs_sorted_in_alphabetical_order = id_query_set_pairs_sorted_in_alphabetical_order[:3]
 
     async def task(identifier: str, query_set: QuerySet):
         """
@@ -103,7 +108,7 @@ async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_p
         ResponseSet([score_summary]).store_to(score_output_path)
     
     tasks = []
-    for identifier, query_set in query_sets_by_identifiers.items():
+    for identifier, query_set in id_query_set_pairs_sorted_in_alphabetical_order:
         tasks.append(task(identifier, query_set))
 
     for completed_task in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc=f"{DATASET_NAME}: Task Completion Progress", position=0):

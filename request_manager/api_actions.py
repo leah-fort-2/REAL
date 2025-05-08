@@ -172,7 +172,7 @@ def extract_content(OAI_response, enable_metrics) -> dict[str, int | str]:
         reasoning_content = OAI_response['choices'][0]['message']['reasoning_content']
         extracted.update({"reasoning_content": reasoning_content})
     except (TypeError, KeyError, IndexError):
-        logger.error(f"Failed to extract content from API response: {OAI_response}")
+        pass
     # choices
     try:
         msg = OAI_response['choices'][0]['message']['content']

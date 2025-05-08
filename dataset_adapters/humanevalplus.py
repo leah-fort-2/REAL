@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # HumanEval has dedicated preprocessing methods. clean_humaneval_preprocessor is for non-cot eval and the other one, you bet.
-RESPONSE_PREPROCESSOR = clean_humaneval_cot_preprocessor
+RESPONSE_PREPROCESSOR = clean_humaneval_preprocessor
 
 async def conduct_humanevalplus(humanevalplus_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False, enable_metrics=False):
     """
@@ -20,7 +20,8 @@ async def conduct_humanevalplus(humanevalplus_file_path: str, worker: Worker, re
     :params humanevalplus_file_path: The humanevalplus test file path.
     :params worker: The industrious worker.
     :params str results_dir: Store result file in this directory. Default to: results
-    :params bool test_mode: only the first 10 questions are tested. Only for debug purposes.
+    :params bool test_mode: only the first 3 questions are tested. Only for debug purposes.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     # humanevalplus specific settings, do not modify
     QUERY_KEY = "prompt"
@@ -36,7 +37,7 @@ async def conduct_humanevalplus(humanevalplus_file_path: str, worker: Worker, re
     query_set = QuerySet(humanevalplus_file_path)
     
     if test_mode:
-        query_set = query_set[:10]
+        query_set = query_set[:3]
         results_dir = os.path.join("test/", results_dir)
         score_output_path = os.path.join("test/", score_output_path)
         

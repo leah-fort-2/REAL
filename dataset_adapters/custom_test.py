@@ -9,18 +9,19 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def run_test(test_file_path: str, workers: list[Worker], output_dir="results/custom_tests",test_mode=False, judging_algorithm=STRICT_MATCH, response_preprocessor=as_is, query_key="query", answer_key="answer"):
+async def run_test(test_file_path: str, workers: list[Worker], output_dir="results/custom_tests",test_mode=False, judging_algorithm=STRICT_MATCH, response_preprocessor=as_is, query_key="query", answer_key="answer", enable_metrics=False):
     """
     Conduct a custom evaluation with a test data file. Support xlsx, csv and jsonl.
 
     :params test_file_path: A file containing query strings. One query per line. Currently xlsx/csv/jsonl. Depend on ResponseSet.store_to method.
     :params list[Worker] workers: The workers to dispatch.
     :params str output_dir: Store result file in this directory. Default to: results/custom_tests
-    :params bool test_mode: only the first subset under dataset_dir will be tested. Only for debug purposes.
+    :params bool test_mode: Only the first 3 queries will be evaluated. Only for debug purposes.
     :params judging_algorithm: The judging algorithm used for score judging. Preset: STRICT_MATCH (for A == A), TEXT_SIMILARITY (based on minimal editing steps), and MODEL_SCORING (submitted to a judger model).
     :params response_preprocessor: Preprocess the response before score judging. Default to as_is.
     :params query_key: The key for evaluation queries. Set as your query file requires.
     :params answer_key: Conduct score judging based on this key. Required for score judging.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     
     # Check if both query_file_path and output_dir exist
@@ -36,7 +37,7 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
     preview_eval_counts([query_set])
     
     if test_mode:
-        query_set = query_set[:10]
+        query_set = query_set[:3]
         output_dir = os.path.join("test/", output_dir)
             
     QUERY_SET_NAME = parse_filename_from_path(test_file_path)
@@ -46,7 +47,7 @@ async def run_test(test_file_path: str, workers: list[Worker], output_dir="resul
     for i, worker in enumerate(workers):
         model_name = worker.get_params()["model"]
         model_response_key = f"{model_name}_response"
-        response_set = await worker(query_set, query_key=query_key, response_key=model_response_key).invoke()
+        response_set = await worker(query_set, query_key=query_key, response_key=model_response_key).invoke(enable_metrics=enable_metrics)
         response_list = response_set.get_responses()
         if i == 0:
             # First job, initialize response list, no need to aggregate

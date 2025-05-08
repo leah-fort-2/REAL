@@ -30,7 +30,7 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, response_preprocessor:
     :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
     :params shuffled: Each query evaluates with shuffled options. 
     :params int subset_max_size: 0 (default) = eval all entries; 50 = the first 50 entries of each subfield, etc.
-    :params test_mode: only first 10 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params test_mode: only first 3 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
     :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     DATASET_NAME = "cmmlu"
@@ -81,9 +81,9 @@ async def conduct_cmmlu(dataset_dir: str, worker: Worker, response_preprocessor:
     
     for raw_dataset in datasets:
         # The original cmmlu test set contains 5 mcq fields. Need to merge them into one.
-        # Test mode: Only the first 10 queries will be evaluated.
+        # Test mode: Only the first 3 queries will be evaluated.
         if test_mode:
-            raw_dataset = raw_dataset[:10]
+            raw_dataset = raw_dataset[:3]
         else:
             if subset_max_size > 0:
                 raw_dataset = raw_dataset[:subset_max_size]

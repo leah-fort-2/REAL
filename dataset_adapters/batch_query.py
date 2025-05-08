@@ -3,7 +3,7 @@ from dataset_models import QuerySet, ResponseSet
 from pathfinders import parse_filename_from_path, sanitize_pathname
 import os
 
-async def batch_query(query_file_path: str, workers: list[Worker], output_dir="results/batch_query", query_key="query", test_mode=False):
+async def batch_query(query_file_path: str, workers: list[Worker], output_dir="results/batch_query", query_key="query", test_mode=False, enable_metrics=False):
     """
     Conduct a naive batch query without score judging. 
     
@@ -14,7 +14,8 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
     :params list[Worker] workers: The workers to dispatch.
     :params output_dir: Store result file in this directory. Default to: results/batch_query
     :params query_key: Specify which key to query. Default to: "query"
-    :params test_mode: Only the first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params test_mode: Only the first 3 queries will be evaluated. Only for debug purposes.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     
     # Check if both query_file_path and output_dir exist
@@ -26,7 +27,7 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
     query_set = QuerySet(query_file_path)
         
     if test_mode:
-        query_set = query_set[:10]
+        query_set = query_set[:3]
         output_dir = os.path.join("test/", output_dir)
             
     QUERY_SET_NAME = parse_filename_from_path(query_file_path)
@@ -37,7 +38,7 @@ async def batch_query(query_file_path: str, workers: list[Worker], output_dir="r
     for i, worker in enumerate(workers):
         model_name = worker.get_params()["model"]
         model_response_key = f"{model_name}_response"
-        response_set = await worker(query_set, query_key=query_key, response_key=model_response_key).invoke()
+        response_set = await worker(query_set, query_key=query_key, response_key=model_response_key).invoke(enable_metrics=enable_metrics)
         response_list = response_set.get_responses()
         if i == 0:
             # First job, initialize response list, no need to aggregate

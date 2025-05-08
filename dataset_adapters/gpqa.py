@@ -29,7 +29,8 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: 
     :params Callable[[str], str] response_preprocessor: Preprocess model responses before they go to the court. Select on your need.
     :params results_dir: Store evaluation results in this directory. e.g. results/gpqa/athene-v2-chat/test-athene-v2-chat-gpqa_main.xlsx
     :params score_output_path: Store a score summary. Format supported: same as "Evaluation format supported".
-    :params test_mode: only first 10 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params test_mode: only first 3 questions from first subset under dataset_dir will be evaluated. Only for debug purposes.
+    :params bool enable_metrics: Whether to read "usage" key from response body. Only available when the server enabled metrics.
     """
     DATASET_NAME = "gpqa"
     MODEL = worker.get_params()["model"]
@@ -87,8 +88,8 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: 
     for i, subset_path in enumerate(datasets):
         selected_keys = [original_query_key, original_answer_key, *original_option_keys]
         
-        # Test mode: Only the first 10 queries will be evaluated.
-        raw_dataset = QuerySet(subset_path, field_names=selected_keys)[:10] if test_mode else QuerySet(subset_path, field_names=selected_keys)
+        # Test mode: Only the first 3 queries will be evaluated.
+        raw_dataset = QuerySet(subset_path, field_names=selected_keys)[:3] if test_mode else QuerySet(subset_path, field_names=selected_keys)
 
         # gpqa has the following data structure:
         # {... "Question", "Correct Answer", "Incorrect Answer 1", "Incorrect Answer 2", "Incorrect Answer 3", ...} : dict

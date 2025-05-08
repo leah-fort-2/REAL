@@ -37,6 +37,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+FALLBACK_FIELD_VALUE="null"
+
 def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
     """
     Write a `RESULTFILE` to the specified directory. Append.
@@ -60,31 +62,31 @@ def log_resultfile(dataset_name, worker: Worker, log_dir: str, params: dict):
     final_values.pop("api_key", None)
         
     # Create the RESULTFILE content
-    resultfile_content = f"""date: {final_values.pop('date', "null")}
+    resultfile_content = f"""date: {final_values.pop('date', FALLBACK_FIELD_VALUE)}
 model: {final_values.pop('model', 'local-model')}
-backend: {final_values.pop('backend', "null")}
-quantized: {final_values.pop('quantized', "null")}
-quantization_bits: {final_values.pop('quantization_bits', "null")}
+backend: {final_values.pop('backend', FALLBACK_FIELD_VALUE)}
+quantized: {final_values.pop('quantized', FALLBACK_FIELD_VALUE)}
+quantization_bits: {final_values.pop('quantization_bits', FALLBACK_FIELD_VALUE)}
 
 # model settings
-temperature: {final_values.pop('temperature', "null")}
-top_p: {final_values.pop('top_p', "null")}
-top_k: {final_values.pop('top_k', "null")}
-max_tokens: {final_values.pop('max_tokens', "null")}
-frequency_penalty: {final_values.pop('frequency_penalty', "null")}
-presence_penalty: {final_values.pop('presence_penalty', "null")}
-repetition_penalty: {final_values.pop('repetition_penalty', "null")}
+temperature: {final_values.pop('temperature', FALLBACK_FIELD_VALUE)}
+top_p: {final_values.pop('top_p', FALLBACK_FIELD_VALUE)}
+top_k: {final_values.pop('top_k', FALLBACK_FIELD_VALUE)}
+max_tokens: {final_values.pop('max_tokens', FALLBACK_FIELD_VALUE)}
+frequency_penalty: {final_values.pop('frequency_penalty', FALLBACK_FIELD_VALUE)}
+presence_penalty: {final_values.pop('presence_penalty', FALLBACK_FIELD_VALUE)}
+repetition_penalty: {final_values.pop('repetition_penalty', FALLBACK_FIELD_VALUE)}
 
 # prompt settings
-system_prompt: "{escape(final_values.pop('system_prompt', 'null'))}"
-prompt_prefix: "{escape(final_values.pop('prompt_prefix', 'null'))}"
-prompt_suffix: "{escape(final_values.pop('prompt_suffix', 'null'))}"
+system_prompt: {escape(final_values.pop('system_prompt', FALLBACK_FIELD_VALUE))}
+prompt_prefix: {escape(final_values.pop('prompt_prefix', FALLBACK_FIELD_VALUE))}
+prompt_suffix: {escape(final_values.pop('prompt_suffix', FALLBACK_FIELD_VALUE))}
 
 # score judging specifics
-test_set_name: {final_values.pop('test_set_name', "null")}
-test_set_type: {final_values.pop('test_set_type', "null")}
-judging_method: {final_values.pop('judging_method', "null")}
-subset_max_size: {final_values.pop('subset_max_size', 'null')}
+test_set_name: {final_values.pop('test_set_name', FALLBACK_FIELD_VALUE)}
+test_set_type: {final_values.pop('test_set_type', FALLBACK_FIELD_VALUE)}
+judging_method: {final_values.pop('judging_method', FALLBACK_FIELD_VALUE)}
+subset_max_size: {final_values.pop('subset_max_size', FALLBACK_FIELD_VALUE)}
 
 # other parameters
 {"\n".join([
@@ -108,6 +110,8 @@ subset_max_size: {final_values.pop('subset_max_size', 'null')}
     else:
         log_failed_msg()
         
-def escape(str):
-    state = str.replace("\n", "\\n")
-    return state
+def escape(s):
+    if s != FALLBACK_FIELD_VALUE:
+        s = s.replace("\n", "\\n")
+        s = f"\"{s}\""
+    return s

@@ -153,15 +153,27 @@ def make_request_body(request_str, **request_params):
 
 NONE_CONTENT_ERROR_MSG = "Received None content."
 
-def extract_content(OAI_response):
+def extract_content(OAI_response, enable_metrics) -> dict[str, int | str]:
     """
+    Extract message content. Extract reasoning_content if exists. Extract metrics depending on enable_metrics (True to extract).
+    
     :params OAI_response: response dict from an OpenAI compatible API. Should be structured as:
     ```{'choices': [
             {'message': 
                 {'content': '...'}
             }]
         }
+    ```
+    :return dict: {("reasoning_content"), "content", "prompt_tokens", "completion_tokens"}
     """
+    extracted = dict()
+    # Try parse reasoning content
+    try:
+        reasoning_content = OAI_response['choices'][0]['message']['reasoning_content']
+        extracted.update({"reasoning_content": reasoning_content})
+    except (TypeError, KeyError, IndexError):
+        logger.error(f"Failed to extract content from API response: {OAI_response}")
+    # choices
     try:
         msg = OAI_response['choices'][0]['message']['content']
         if msg is None:
@@ -171,68 +183,27 @@ def extract_content(OAI_response):
         msg = ''
     except ValueError:
         msg = NONE_CONTENT_ERROR_MSG
-    return msg
-    
-def extract_usage(OAI_response) -> Tuple[str | None, int, int]:
-    """
-    :params OAI_response: response dict from an OpenAI compatible API. Should be structured as:
-    ```{'choices': [
-            {'message': 
-                {'content': str}
-            }],
-        'usage': 
-            {
-                'prompt_tokens': int,
-                'completion_tokens': int
-            }
-        }
-    ```
-    :returns: Tuple[message, prompt_tokens, completion_tokens]
-    """
-    try:
-        msg: str | None = OAI_response['choices'][0]['message']['content']
-        if msg is None:
-            raise ValueError
-    except (TypeError, KeyError, IndexError):
-        logger.error(f"Failed to extract content from API response: {OAI_response}")
-        msg = ''
-    except ValueError:
-        msg = NONE_CONTENT_ERROR_MSG
-    try:
-        prompt_tokens = OAI_response['usage']['prompt_tokens']
-    except (TypeError, KeyError, IndexError):
-        logger.error(f"Failed to extract prompt token usage from API response: {OAI_response}")
-        prompt_tokens = 0
-    try:
-        completion_tokens = OAI_response['usage']['completion_tokens']
-    except (TypeError, KeyError, IndexError):
-        logger.error(f"Failed to extract completion token usage from API response: {OAI_response}")
-        completion_tokens = 0
-
-    return (msg, prompt_tokens, completion_tokens)
-
-def extract_content_with_reasoning(o1_response):
-    """
-    :params o1_response: response dict from an OAI API with `reasoning_content` output. Should be structured as:
-    ```{'choices': [
-            {'message': 
-                {
-                    'reasoning_content': '...',
-                    'content': '...'}
-            }]
-        }
-    """ 
-    try:
-        reasoning_content = o1_response['choices'][0]['message']['reasoning_content']
-        reasoning_content = "\n".join([f"> {line}" for line in reasoning_content.split("\n")])
-    except Exception as e:
-        logger.error(f"Failed to extract reasoning content: {str(e)}")
-        reasoning_content = ""
-    # Extract main message string
-    try:
-        content = o1_response['choices'][0]['message']['content']
-    except (TypeError, KeyError, IndexError):
-        logger.error(f"Failed to extract content from API response: {o1_response}")
-        return ''
-    
-    return f"{reasoning_content}\n{content}"
+    extracted.update({"content": msg})
+        # {
+        #     'usage': 
+        #         {
+        #             'prompt_tokens': int,
+        #             'completion_tokens': int
+        #         }
+        # }
+    if enable_metrics:
+        try:
+            prompt_tokens = OAI_response['usage']['prompt_tokens']
+        except (TypeError, KeyError, IndexError):
+            logger.error(f"Failed to extract prompt token usage from API response: {OAI_response}")
+            prompt_tokens = 0
+        try:
+            completion_tokens = OAI_response['usage']['completion_tokens']
+        except (TypeError, KeyError, IndexError):
+            logger.error(f"Failed to extract completion token usage from API response: {OAI_response}")
+            completion_tokens = 0
+        extracted.update({
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens
+        })
+    return extracted

@@ -57,6 +57,7 @@ async def model_scoring(response:str, answer: str, context: str):
     scoring_query = make_scoring_query(response, answer, context)
     
     scoring_result = await single_request(scoring_query, scoring_parameters)
+    scoring_result = scoring_result["content"]
     # Reminder: request_manager module is None safe. If the api request failed, a FALLBACK_ERR_MSG is returned.
     
     # Parse the binary score. Choose to use either cot or non-cot preprocessor.

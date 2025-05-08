@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # HumanEval has dedicated preprocessing methods. clean_humaneval_preprocessor is for non-cot eval and the other one, you bet.
 RESPONSE_PREPROCESSOR = clean_humaneval_preprocessor
 
-async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
+async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False, enable_metrics=False):
     """
     Conduct humaneval evaluation through its test file.
 
@@ -42,11 +42,16 @@ async def conduct_humaneval(humaneval_file_path: str, worker: Worker, results_di
         
     
     logger.info(f"Conducting test: {humaneval_file_path} ({len(query_set)})")
-    response_set: ResponseSet = await worker(query_set, query_key=QUERY_KEY, response_key=RESPONSE_KEY).invoke()
+    response_set: ResponseSet = await worker(query_set, query_key=QUERY_KEY, response_key=RESPONSE_KEY).invoke(enable_metrics=enable_metrics)
     
     # Score judging for IFEval
     score_entry = humaneval_eval_raw_pass(response_set, humaneval_file_path, response_preprocessor=RESPONSE_PREPROCESSOR)
-    score_entry.update({"dataset": DATASET_NAME, "model": MODEL})
+    score_entry.update({
+        "dataset": DATASET_NAME,
+        "model": MODEL
+        })
+    if enable_metrics:
+        score_entry.update({"total_output_tokens": sum([query["output_tokens"] for query in response_set.get_responses()])})
     
     # Store (Append to) result file
     result_filename = craft_result_path(query_set, results_dir, DATASET_NAME, MODEL, file_ext="xlsx")

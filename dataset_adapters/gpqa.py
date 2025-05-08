@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 JUDGER=STRICT_MATCH
 
-async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
+async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", test_mode=False, enable_metrics=False):
     """
     Conduct a gpqa test. Before evaluation, create a worker instance.
     
@@ -52,7 +52,7 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: 
     target_option_keys = ["A", "B", "C", "D"]
     
     async def task(query_set: QuerySet):
-        response_set = await worker(query_set, "query").invoke()
+        response_set = await worker(query_set, "query").invoke(enable_metrics=enable_metrics)
 
         subset_path = query_set.get_path()
         # this get_path method can return None when query_set is instantiated with a literal query string list. However, this wouldn't happen in dataset evaluation. No need for None safety validation.
@@ -66,7 +66,12 @@ async def conduct_gpqa(dataset_dir: str, worker: Worker, response_preprocessor: 
         # Store response with score info updated in response_set
         response_set.store_to(craft_result_path(query_set, results_dir, DATASET_NAME, MODEL))
         
-        score_result.update({"dataset": DATASET_NAME, "model": MODEL})
+        score_result.update({
+            "dataset": DATASET_NAME,
+            "model": MODEL
+            })
+        if enable_metrics:
+            score_result.update({"total_output_tokens": sum([query["output_tokens"] for query in response_set.get_responses()])})
         ResponseSet([score_result]).store_to(score_output_path)
         
     # Create QuerySet instances from dataset paths (in this case, only one for GPQA)

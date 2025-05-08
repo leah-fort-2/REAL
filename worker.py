@@ -164,7 +164,7 @@ class Worker:
             """
             return self.worker
         
-        async def invoke(self):
+        async def invoke(self, enable_metrics=False):
             """
             Start this job.
             """
@@ -179,11 +179,22 @@ class Worker:
             
             # Launch requests
             params: dict[str, Any] = worker.get_params()
-            response_list = await process_batch(query_string_list, params)
-            
+            batch_results = await process_batch(query_string_list, params, enable_metrics=enable_metrics)
+
             # Post works
-            for query, response in zip(queries, response_list):
-                query.update({response_key: response})
+            if enable_metrics:
+                for query, result_obj in zip(queries, batch_results):
+                    query.update({
+                        response_key: result_obj["content"],
+                        "input_tokens": result_obj["prompt_tokens"],
+                        "output_tokens": result_obj["completion_tokens"]
+                        })
+            else:
+                for query, result_obj in zip(queries, batch_results):
+                    query.update({
+                        response_key: result_obj["content"],
+                        })
+
             return ResponseSet(queries, query_key=query_key, response_key=response_key)
         
     def __init__(self, request_params: RequestParams):

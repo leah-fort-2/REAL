@@ -3,7 +3,7 @@ from typing import Callable
 from tqdm import tqdm
 from dataset_models import QuerySet, ResponseSet
 from judgers.presets import STRICT_MATCH
-from pathfinders import craft_eval_dir_path, strip_trailing_slashes_from_path
+from pathfinders import craft_eval_dir_path, sanitize_pathname, strip_trailing_slashes_from_path
 from resultfile_logger import log_resultfile
 from worker import Worker
 import os
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 JUDGER = STRICT_MATCH
 
-async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", test_mode=False, subset_max_size=0):
+async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", test_mode=False, subset_max_size=0, enable_metrics=False):
     """
     Conduct an mmlu pro evaluation. Before calling the method, create a worker.
 
@@ -71,7 +71,7 @@ async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_pre
         #     {... "question": ..., "options": [...], "answer": ..., ...}
         # ]:
         mcq_query_set = make_mcq_from_query_set(query_set, query_key=QUERY_KEY, options_key=OPTIONS_KEY)
-        response_set = await worker(mcq_query_set, query_key=QUERY_KEY).invoke()
+        response_set = await worker(mcq_query_set, query_key=QUERY_KEY).invoke(enable_metrics=enable_metrics)
         score_summary = await response_set.judge(
             answer_key=ANSWER_KEY,
             eval_name=category,
@@ -90,7 +90,12 @@ async def conduct_mmlu_pro(mmlu_pro_file_path: str, worker: Worker, response_pre
             )
         
         # Calculate score for each category.
-        score_summary.update({"dataset": DATASET_NAME, "model": MODEL})
+        score_summary.update({
+            "dataset": DATASET_NAME,
+            "model": MODEL
+            })
+        if enable_metrics:
+            score_summary.update({"total_output_tokens": sum([query["output_tokens"] for query in response_set.get_responses()])})
         ResponseSet([score_summary]).store_to(score_output_path)
     
     tasks = []

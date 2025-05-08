@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 JUDGER=STRICT_MATCH
 
-async def conduct_mmlu(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", shuffled=False, test_mode=False, subset_max_size=0):
+async def conduct_mmlu(dataset_dir: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", shuffled=False, test_mode=False, subset_max_size=0, enable_metrics=False):
     """
     Conduct a ceval test. Before evaluation, create a worker instance.
     
@@ -43,7 +43,7 @@ async def conduct_mmlu(dataset_dir: str, worker: Worker, response_preprocessor: 
         raise FileNotFoundError(f"Destination results directory is not found: {results_dir}")
     
     async def task(query_set: QuerySet):
-        response_set = await worker(query_set, QUERY_KEY).invoke()
+        response_set = await worker(query_set, QUERY_KEY).invoke(enable_metrics=enable_metrics)
         subset_path = query_set.get_path()
         # this get_path method can return None when query_set is instantiated with a literal query string list. However, this wouldn't happen in dataset evaluation. No need for None safety validation.
 
@@ -56,7 +56,12 @@ async def conduct_mmlu(dataset_dir: str, worker: Worker, response_preprocessor: 
         # Store response with score info updated in response_set
         response_set.store_to(craft_result_path(query_set, results_dir, DATASET_NAME, MODEL))
         
-        score_result.update({"dataset": DATASET_NAME, "model": MODEL})
+        score_result.update({
+            "dataset": DATASET_NAME,
+            "model": MODEL
+            })
+        if enable_metrics:
+            score_result.update({"total_output_tokens": sum([query["output_tokens"] for query in response_set.get_responses()])})
         ResponseSet([score_result]).store_to(score_output_path)
             
     # Create QuerySet instances from dataset paths

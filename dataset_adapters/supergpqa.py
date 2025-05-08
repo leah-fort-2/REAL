@@ -8,13 +8,14 @@ from resultfile_logger import log_resultfile
 from worker import Worker
 import os
 import logging
+# from qwq_blacklist import blacklist
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 JUDGER = STRICT_MATCH
 
-async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", subset_max_size=0, test_mode=False):
+async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_preprocessor: Callable[[str], str], results_dir="results", score_output_path="model_results.xlsx", subset_max_size=0, test_mode=False, enable_metrics=False):
     """
     Conduct an superGPQA evaluation. Before calling the method, create a worker.
 
@@ -74,7 +75,7 @@ async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_p
         #     {... "question": ..., "options": [...], "answer": ..., ...}
         # ]:
         mcq_query_set = make_mcq_from_query_set(query_set, query_key=QUERY_KEY, options_key=OPTIONS_KEY)
-        response_set = await worker(mcq_query_set, query_key=QUERY_KEY).invoke()
+        response_set = await worker(mcq_query_set, query_key=QUERY_KEY).invoke(enable_metrics=enable_metrics)
         score_summary = await response_set.judge(
             answer_key=ANSWER_KEY,
             eval_name=identifier,
@@ -93,7 +94,12 @@ async def conduct_supergpqa(supergpqa_file_path: str, worker: Worker, response_p
             )
         
         # Calculate score for each identifier.
-        score_summary.update({"dataset": DATASET_NAME, "model": MODEL})
+        score_summary.update({
+            "dataset": DATASET_NAME,
+            "model": MODEL
+            })
+        if enable_metrics:
+            score_summary.update({"total_output_tokens": sum([query["output_tokens"] for query in response_set.get_responses()])})
         ResponseSet([score_summary]).store_to(score_output_path)
     
     tasks = []

@@ -11,9 +11,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # IfEval does not need response preprocessing (use as_is) unless you are evaluating reasoning models.
-RESPONSE_PREPROCESSOR=as_is
+RESPONSE_PREPROCESSOR=remove_think_tags
 
-async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False):
+async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir="results", score_output_path="model_results.xlsx", test_mode=False, enable_metrics=False):
     """
     Conduct IFEval through its test file.
 
@@ -28,6 +28,11 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
     RESPONSE_KEY = "response"
     DATASET_NAME = "IFEval"
     MODEL = worker.get_params()["model"]
+
+    # Bypass vllm naming limit
+    # 
+    # worker.request_params.model="qwen3-32b-gptq-4.0bit"
+
     # Check if both query_file_path and output_dir exist
     if not os.path.isfile(ifeval_src_file_path):
         raise FileNotFoundError(f"Speficied ifeval file is not found: {ifeval_src_file_path}")
@@ -43,12 +48,16 @@ async def conduct_ifeval(ifeval_src_file_path: str, worker: Worker, results_dir=
         
     
     logger.info(f"Conducting test: {ifeval_src_file_path} ({len(query_set)})")
-    response_set: ResponseSet = await worker(query_set, query_key=QUERY_KEY, response_key=RESPONSE_KEY).invoke()
+    response_set: ResponseSet = await worker(query_set, query_key=QUERY_KEY, response_key=RESPONSE_KEY).invoke(enable_metrics=enable_metrics)
     
     # Score judging for IFEval
     score_entry = ifeval_judge_strict(response_set, ifeval_src_file_path, response_preprocessor=RESPONSE_PREPROCESSOR)
-    score_entry.update({"dataset": DATASET_NAME, "model": MODEL})
-    
+    score_entry.update({
+        "dataset": DATASET_NAME,
+        "model": MODEL
+        })
+    if enable_metrics:
+        score_entry.update({"total_output_tokens": sum([query["output_tokens"] for query in response_set.get_responses()])})
     # Store (Append to) result file
     result_filename = craft_result_path(query_set, results_dir, DATASET_NAME, MODEL, file_ext="jsonl")
     response_set.store_to(result_filename)

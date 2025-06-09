@@ -43,7 +43,7 @@ def craft_result_path(query_set: QuerySet, results_dir, dataset_name, model, fil
     if file_path != None:
         query_name = parse_filename_from_path(query_set.get_path())
     
-    return f'{strip_trailing_slashes_from_path(results_dir)}/{dataset_name}/{model}/{sanitize_pathname(f"test-{model}-{query_name}")}.{file_ext}'
+    return f'{strip_trailing_slashes_from_path(results_dir)}/{dataset_name}/{model}/{sanitize_pathname(f"{query_name}")}.{file_ext}'
 
 def craft_eval_dir_path(results_dir, dataset_name, model):
     """

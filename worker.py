@@ -184,6 +184,8 @@ class Worker:
             # Post works
             if enable_metrics:
                 for query, result_obj in zip(queries, batch_results):
+                    if result_obj.get("reasoning_content", None) is not None:
+                        query.update({"reasoning_content": result_obj["reasoning_content"]})
                     query.update({
                         response_key: result_obj["content"],
                         "input_tokens": result_obj["prompt_tokens"],
@@ -191,6 +193,8 @@ class Worker:
                         })
             else:
                 for query, result_obj in zip(queries, batch_results):
+                    if result_obj.get("reasoning_content", None) is not None:
+                        query.update({"reasoning_content": result_obj["reasoning_content"]})
                     query.update({
                         response_key: result_obj["content"],
                         })

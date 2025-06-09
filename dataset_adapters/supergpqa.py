@@ -147,7 +147,7 @@ def make_mcq_from_query_set(query_set: QuerySet, query_key:str, options_key: str
     return new_query_set
 
 def craft_category_path(results_dir: str, dataset_name: str, model: str, category: str, file_ext):
-        return f"{strip_trailing_slashes_from_path(results_dir)}/{dataset_name}/{model}/{sanitize_pathname(f"test-{model}-{category}")}.{file_ext}"
+        return f"{strip_trailing_slashes_from_path(results_dir)}/{dataset_name}/{model}/{sanitize_pathname(f"{category}")}.{file_ext}"
     
         
 def preview_eval_counts(query_sets_by_identifiers: dict[str, QuerySet]):
